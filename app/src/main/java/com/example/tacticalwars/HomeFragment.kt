@@ -52,6 +52,13 @@ class HomeFragment : Fragment() {
         view.findViewById<ImageButton>(R.id.btnSettings).setOnClickListener {
             showSettingsDialog()
         }
+
+        view.findViewById<Button>(R.id.btnStart).setOnClickListener {
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, MapSelectionFragment())
+                .addToBackStack(null)
+                .commit()
+        }
     }
 
     private fun setupMusic() {

@@ -7,23 +7,34 @@
     android:background="#121212"
     tools:context=".GameFragment">
 
-
-    <TextView
-        android:id="@+id/tvTopPlaceholder"
+    <LinearLayout
+        android:id="@+id/llHeader"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
+        android:orientation="vertical"
+        android:padding="16dp"
         android:gravity="center"
-        android:text="TURNO JUGADOR ROJO"
-        android:textColor="#FFFFFF"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        app:layout_constraintBottom_toTopOf="@+id/flBoardContainer"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_chainStyle="spread" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
+        <TextView
+            android:id="@+id/tvTurnTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TURNO JUGADOR AZUL"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvHealthInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Salud Equipo: --"
+            android:textColor="#B3FFFFFF"
+            android:textSize="14sp" />
+    </LinearLayout>
 
     <FrameLayout
         android:id="@+id/flBoardContainer"
@@ -31,12 +42,11 @@
         android:layout_height="0dp"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
-        app:layout_constraintBottom_toTopOf="@+id/tvBottomPlaceholder"
         app:layout_constraintDimensionRatio="6:8"
+        app:layout_constraintBottom_toTopOf="@+id/llBottomUI"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tvTopPlaceholder">
-
+        app:layout_constraintTop_toBottomOf="@+id/llHeader">
 
         <ImageView
             android:id="@+id/ivGameBackground"
@@ -54,19 +64,60 @@
             android:background="#20000000" />
     </FrameLayout>
 
-
-    <TextView
-        android:id="@+id/tvBottomPlaceholder"
+    <LinearLayout
+        android:id="@+id/llBottomUI"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:gravity="center"
-        android:text="UNIDAD SELECCIONADA: NINGUNA\n[ MOVER | ATACAR | ESPERAR ]"
-        android:textColor="#B3FFFFFF"
-        android:textSize="14sp"
+        android:orientation="vertical"
+        android:padding="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/flBoardContainer" />
+        app:layout_constraintStart_toStartOf="parent">
+
+        <TextView
+            android:id="@+id/tvUnitDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="SELECCIONA UNA UNIDAD"
+            android:textColor="#B3FFFFFF"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:id="@+id/llActions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:visibility="invisible">
+
+            <Button
+                android:id="@+id/btnAttack"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="ATACAR"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_marginEnd="4dp"/>
+
+            <Button
+                android:id="@+id/btnSecondary"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="HAB. SEC."
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_marginEnd="4dp"/>
+
+            <Button
+                android:id="@+id/btnWait"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="ESPERAR"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+        </LinearLayout>
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -55,7 +55,7 @@ class HomeFragment : Fragment() {
 
         view.findViewById<Button>(R.id.btnStart).setOnClickListener {
             parentFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, MapSelectionFragment())
+                .replace(R.id.fragment_container, MapSelectionFragment.newInstance(difficulty))
                 .addToBackStack(null)
                 .commit()
         }

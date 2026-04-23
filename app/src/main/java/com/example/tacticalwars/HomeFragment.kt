@@ -6,6 +6,8 @@ import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.media.MediaPlayer
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,6 +15,7 @@ import android.view.animation.LinearInterpolator
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.Spinner
 import androidx.fragment.app.Fragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -26,6 +29,18 @@ class HomeFragment : Fragment() {
     private var sfxVolume: Float = 0.5f
     private var difficulty: String = "Normal"
 
+    private var currentFrame = 1
+    private val handler = Handler(Looper.getMainLooper())
+    private val animationRunnable = object : Runnable {
+        override fun run() {
+            currentFrame = if (currentFrame >= 3) 1 else currentFrame + 1
+            updateUnitImages()
+            handler.postDelayed(this, 500)
+        }
+    }
+
+    private var unitViews: List<ImageView> = emptyList()
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -38,14 +53,18 @@ class HomeFragment : Fragment() {
 
         setupMusic()
 
-        val units = listOf(
+        val unitIds = listOf(
             R.id.redUnit1, R.id.redUnit2, R.id.redUnit3, R.id.redUnit4,
             R.id.blueUnit1, R.id.blueUnit2, R.id.blueUnit3, R.id.blueUnit4
-        ).map { view.findViewById<View>(it) }
+        )
+        unitViews = unitIds.map { view.findViewById<ImageView>(it) }
+
+        updateUnitImages()
+        handler.post(animationRunnable)
 
         view.post {
             if (isAdded) {
-                startParade(units, view.width.toFloat())
+                startParade(unitViews, view.width.toFloat())
             }
         }
 
@@ -58,6 +77,21 @@ class HomeFragment : Fragment() {
                 .replace(R.id.fragment_container, MapSelectionFragment.newInstance(difficulty))
                 .addToBackStack(null)
                 .commit()
+        }
+    }
+
+    private fun updateUnitImages() {
+        if (!isAdded) return
+        val prefixes = listOf("infantry", "bazooka", "tank", "jet")
+        unitViews.forEachIndexed { index, imageView ->
+            val isRed = index < 4
+            val typeIndex = index % 4
+            val teamStr = if (isRed) "red" else "blue"
+            val resName = "${prefixes[typeIndex]}still$teamStr$currentFrame"
+            val resId = resources.getIdentifier(resName, "drawable", requireContext().packageName)
+            if (resId != 0) {
+                imageView.setImageResource(resId)
+            }
         }
     }
 
@@ -153,6 +187,7 @@ class HomeFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         animatorSet?.cancel()
+        handler.removeCallbacks(animationRunnable)
         mediaPlayer?.release()
         mediaPlayer = null
     }

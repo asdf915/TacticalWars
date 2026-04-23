@@ -13,7 +13,7 @@
         android:layout_height="match_parent"
         android:alpha="0.3"
         android:scaleType="centerCrop"
-        android:src="@drawable/fondo" />
+        android:src="@drawable/background4" />
 
     <TextView
         android:id="@+id/tvSelectMap"
@@ -71,12 +71,16 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:orientation="vertical">
-                    <ImageView
+                    
+                    <GridLayout
+                        android:id="@+id/glPreviewMap1"
                         android:layout_width="match_parent"
                         android:layout_height="0dp"
                         android:layout_weight="1"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/mapa1" />
+                        android:columnCount="6"
+                        android:rowCount="8"
+                        android:background="#000000" />
+                        
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -103,12 +107,16 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:orientation="vertical">
-                    <ImageView
+                    
+                    <GridLayout
+                        android:id="@+id/glPreviewMap2"
                         android:layout_width="match_parent"
                         android:layout_height="0dp"
                         android:layout_weight="1"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/mapa2" />
+                        android:columnCount="6"
+                        android:rowCount="8"
+                        android:background="#000000" />
+                        
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -135,12 +143,16 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:orientation="vertical">
-                    <ImageView
+                    
+                    <GridLayout
+                        android:id="@+id/glPreviewMap3"
                         android:layout_width="match_parent"
                         android:layout_height="0dp"
                         android:layout_weight="1"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/mapa3" />
+                        android:columnCount="6"
+                        android:rowCount="8"
+                        android:background="#000000" />
+                        
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

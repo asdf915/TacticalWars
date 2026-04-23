@@ -1,11 +1,11 @@
 package com.example.tacticalwars
 
 import android.animation.ObjectAnimator
-import android.animation.PropertyValuesHolder
 import android.animation.ValueAnimator
 import android.graphics.Color
 import android.os.Bundle
-import android.view.Gravity
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -18,6 +18,17 @@ import androidx.fragment.app.Fragment
 class VictoryFragment : Fragment() {
 
     private var winnerTeam: Int = 0
+    private var currentFrame = 1
+    private val handler = Handler(Looper.getMainLooper())
+    private val winnerUnitViews = mutableListOf<ImageView>()
+    
+    private val animationRunnable = object : Runnable {
+        override fun run() {
+            currentFrame = if (currentFrame >= 3) 1 else currentFrame + 1
+            updateWinnerAnimations()
+            handler.postDelayed(this, 500)
+        }
+    }
 
     companion object {
         private const val ARG_WINNER_TEAM = "winner_team"
@@ -56,20 +67,26 @@ class VictoryFragment : Fragment() {
         tvVictoryMessage.text = "VICTORIA DEL EQUIPO $teamName"
         tvVictoryMessage.setTextColor(if (winnerTeam == 0) Color.RED else Color.CYAN)
 
+        val unitPrefixes = listOf("infantry", "bazooka", "tank", "jet")
 
         for (i in 0 until 4) {
             val unitView = ImageView(requireContext())
-            val size = (resources.displayMetrics.density * 64).toInt()
+            // Increased size in Victory Screen to 120dp
+            val size = (resources.displayMetrics.density * 120).toInt()
             val params = LinearLayout.LayoutParams(size, size)
-            params.setMargins(16, 0, 16, 0)
+            params.setMargins(8, 0, 8, 0)
             unitView.layoutParams = params
-            unitView.setBackgroundColor(if (winnerTeam == 0) Color.RED else Color.BLUE)
-            unitView.setImageResource(getUnitIcon(i))
-            unitView.setPadding(16, 16, 16, 16)
+            unitView.setPadding(8, 8, 8, 8)
+            unitView.tag = unitPrefixes[i]
+            
             llWinnerUnits.addView(unitView)
+            winnerUnitViews.add(unitView)
 
             startDancingAnimation(unitView, i * 200L)
         }
+
+        updateWinnerAnimations()
+        handler.post(animationRunnable)
 
         btnBackToHome.setOnClickListener {
             parentFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
@@ -79,22 +96,30 @@ class VictoryFragment : Fragment() {
         }
     }
 
+    override fun onDestroyView() {
+        super.onDestroyView()
+        handler.removeCallbacks(animationRunnable)
+    }
+
+    private fun updateWinnerAnimations() {
+        val teamStr = if (winnerTeam == 0) "red" else "blue"
+        for (view in winnerUnitViews) {
+            val prefix = view.tag as String
+            val resName = "${prefix}still$teamStr$currentFrame"
+            val resId = resources.getIdentifier(resName, "drawable", requireContext().packageName)
+            if (resId != 0) {
+                view.setImageResource(resId)
+            }
+        }
+    }
+
     private fun startDancingAnimation(view: View, delay: Long) {
-        val jump = ObjectAnimator.ofFloat(view, "translationY", 0f, -50f).apply {
+        val jump = ObjectAnimator.ofFloat(view, "translationY", 0f, -80f).apply {
             duration = 400
             repeatMode = ValueAnimator.REVERSE
             repeatCount = ValueAnimator.INFINITE
             startDelay = delay
         }
         jump.start()
-    }
-
-    private fun getUnitIcon(index: Int): Int {
-        return when (index % 4) {
-            0 -> android.R.drawable.ic_menu_info_details
-            1 -> android.R.drawable.ic_menu_gallery
-            2 -> android.R.drawable.ic_menu_camera
-            else -> android.R.drawable.ic_menu_compass
-        }
     }
 }

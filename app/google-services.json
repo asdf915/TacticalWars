@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "884863129247",
+    "project_id": "tactical-wars",
+    "storage_bucket": "tactical-wars.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:884863129247:android:195965efd5ba4bda00b4aa",
+        "android_client_info": {
+          "package_name": "com.example.tacticalwars"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7pL06-3Jc9uNwsLepujvvJH05csLZHJM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

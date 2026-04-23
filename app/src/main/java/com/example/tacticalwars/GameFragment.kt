@@ -23,7 +23,7 @@ import java.util.Queue
 
 class GameFragment : Fragment() {
 
-    private var selectedMapResId: Int = 0
+    private var selectedMapId: Int = 0
     private var isAiMode: Boolean = false
     private var difficulty: String = "Normal"
 
@@ -39,6 +39,7 @@ class GameFragment : Fragment() {
     private var currentTeam: Int = 1 // 1: Azul (empieza), 0: Rojo
     private var isWaitingForAction = false
     private var isWaitingForSecondary = false
+    private var isInteractionLocked = false
 
     private lateinit var tvTurnTitle: TextView
     private lateinit var tvHealthInfo: TextView
@@ -48,11 +49,23 @@ class GameFragment : Fragment() {
     private lateinit var btnSecondary: Button
     private lateinit var btnWait: Button
 
-    enum class UnitType(val displayName: String, val moveRange: Int, val attackRange: Int, val maxHP: Int, val abilityName: String) {
-        INFANTRY("Infantería", 3, 1, 10, "Potenciar"),
-        BAZOOKA("Bazuca", 3, 2, 12, "Reactivar"),
-        TANK("Tanque", 2, 1, 20, "Empujar"),
-        PLANE("Avión", 4, 1, 8, "Curar")
+    private var currentFrame = 1
+    private val handler = Handler(Looper.getMainLooper())
+    private val animationRunnable = object : Runnable {
+        override fun run() {
+            currentFrame = if (currentFrame >= 3) 1 else currentFrame + 1
+            updateUnitsAnimations()
+            handler.postDelayed(this, 500)
+        }
+    }
+
+    enum class UnitState { STILL, UP, DOWN, LEFT, RIGHT }
+
+    enum class UnitType(val displayName: String, val moveRange: Int, val attackRange: Int, val maxHP: Int, val abilityName: String, val prefix: String) {
+        INFANTRY("Infantería", 3, 1, 10, "Potenciar", "infantry"),
+        BAZOOKA("Bazuca", 3, 2, 12, "Reactivar", "bazooka"),
+        TANK("Tanque", 2, 1, 20, "Empujar", "tank"),
+        PLANE("Avión", 4, 1, 8, "Curar", "jet")
     }
 
     data class GameUnit(
@@ -65,29 +78,85 @@ class GameFragment : Fragment() {
         var hasActed: Boolean = false,
         var hasMoved: Boolean = false,
         var attackPower: Int = 3,
-        var view: ImageView? = null
+        var view: ImageView? = null,
+        var state: UnitState = UnitState.STILL
     )
 
     companion object {
-        private const val ARG_MAP_RES_ID = "map_res_id"
+        private const val ARG_MAP_ID = "map_id"
         private const val ARG_AI_MODE = "ai_mode"
         private const val ARG_DIFFICULTY = "difficulty"
 
-        fun newInstance(mapResId: Int, aiMode: Boolean = false, difficulty: String = "Normal"): GameFragment {
+        private val MAP1_TILES = listOf(
+            1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 2, 1,
+            1, 1, 2, 1, 1, 1,
+            1, 2, 1, 1, 2, 2,
+            1, 2, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 2, 1,
+            2, 1, 2, 1, 1, 1
+        )
+
+        private val MAP2_TILES = listOf(
+            1, 1, 1, 4, 4, 4,
+            1, 1, 2, 4, 4, 4,
+            4, 5, 4, 4, 1, 1,
+            1, 1, 1, 6, 1, 1,
+            1, 1, 1, 4, 4, 2,
+            1, 1, 1, 1, 4, 1,
+            1, 1, 1, 1, 6, 1,
+            2, 1, 2, 1, 4, 1
+        )
+
+        private val MAP3_TILES = listOf(
+            1, 3, 1, 1, 1, 2,
+            1, 1, 1, 1, 1, 3,
+            4, 4, 1, 1, 1, 1,
+            1, 4, 4, 5, 4, 4,
+            1, 1, 1, 1, 2, 1,
+            1, 2, 1, 1, 1, 1,
+            1, 3, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 2
+        )
+
+        fun newInstance(mapId: Int, aiMode: Boolean = false, difficulty: String = "Normal"): GameFragment {
             val fragment = GameFragment()
             val args = Bundle()
-            args.putInt(ARG_MAP_RES_ID, mapResId)
+            args.putInt(ARG_MAP_ID, mapId)
             args.putBoolean(ARG_AI_MODE, aiMode)
             args.putString(ARG_DIFFICULTY, difficulty)
             fragment.arguments = args
             return fragment
+        }
+
+        fun getTileRes(mapId: Int, index: Int): Int {
+            val tileNum = getTileNum(mapId, index)
+            return when (tileNum) {
+                1 -> R.drawable.tile1
+                2 -> R.drawable.tile2
+                3 -> R.drawable.tile3
+                4 -> R.drawable.tile4
+                5 -> R.drawable.tile5
+                6 -> R.drawable.tile6
+                else -> R.drawable.tile1
+            }
+        }
+
+        private fun getTileNum(mapId: Int, index: Int): Int {
+            return when (mapId) {
+                1 -> if (index < MAP1_TILES.size) MAP1_TILES[index] else 1
+                2 -> if (index < MAP2_TILES.size) MAP2_TILES[index] else 1
+                3 -> if (index < MAP3_TILES.size) MAP3_TILES[index] else 1
+                else -> 1
+            }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         arguments?.let {
-            selectedMapResId = it.getInt(ARG_MAP_RES_ID)
+            selectedMapId = it.getInt(ARG_MAP_ID)
             isAiMode = it.getBoolean(ARG_AI_MODE)
             difficulty = it.getString(ARG_DIFFICULTY, "Normal")
         }
@@ -112,8 +181,10 @@ class GameFragment : Fragment() {
         btnWait = view.findViewById(R.id.btnWait)
 
         val ivBackground = view.findViewById<ImageView>(R.id.ivGameBackground)
-        if (selectedMapResId != 0) {
-            ivBackground.setImageResource(selectedMapResId)
+        if (selectedMapId in 1..3) {
+            ivBackground.visibility = View.GONE
+        } else {
+            ivBackground.setImageResource(R.drawable.background4)
         }
 
         val glBoard = view.findViewById<GridLayout>(R.id.glBoard)
@@ -122,7 +193,6 @@ class GameFragment : Fragment() {
 
         btnWait.setOnClickListener {
             selectedUnit?.let { unit ->
-                unit.hasActed = true
                 grayOutUnit(unit)
                 finishUnitTurn()
             }
@@ -135,6 +205,50 @@ class GameFragment : Fragment() {
         btnSecondary.setOnClickListener {
             selectedUnit?.let { showSecondaryRange(it) }
         }
+
+        handler.post(animationRunnable)
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        handler.removeCallbacks(animationRunnable)
+    }
+
+    private fun updateUnitsAnimations() {
+        for (unit in units) {
+            val teamStr = if (unit.team == 0) "red" else "blue"
+            
+            val statePrefix = when {
+                unit.hasActed -> "unavailable"
+                unit.state == UnitState.UP -> "up"
+                unit.state == UnitState.DOWN -> "down"
+                unit.state == UnitState.LEFT || unit.state == UnitState.RIGHT -> "move"
+                else -> "still"
+            }
+            
+            val resName = "${unit.type.prefix}$statePrefix$teamStr$currentFrame"
+            val resId = resources.getIdentifier(resName, "drawable", requireContext().packageName)
+            if (resId != 0) {
+                unit.view?.setImageResource(resId)
+            }
+            
+
+            val scale = if (statePrefix == "up" || statePrefix == "down" || statePrefix == "move") 1.4f else 1.0f
+            unit.view?.scaleY = scale
+            
+            if (unit.state == UnitState.RIGHT) {
+                unit.view?.scaleX = -scale
+            } else if (unit.state == UnitState.LEFT) {
+                unit.view?.scaleX = scale
+            } else {
+                val currentScaleX = unit.view?.scaleX ?: 1f
+                unit.view?.scaleX = if (currentScaleX < 0) -scale else scale
+            }
+        }
+    }
+
+    private fun getTileTypeAt(r: Int, c: Int): Int {
+        return getTileNum(selectedMapId, r * cols + c)
     }
 
     private fun updateTurnUI() {
@@ -166,6 +280,16 @@ class GameFragment : Fragment() {
                     params.width = cellSize
                     params.height = cellSize
                     frame.layoutParams = params
+                    
+                    if (selectedMapId in 1..3) {
+                        val tileRes = getTileRes(selectedMapId, r * cols + c)
+                        val tileView = ImageView(requireContext())
+                        tileView.layoutParams = FrameLayout.LayoutParams(cellSize, cellSize)
+                        tileView.setImageResource(tileRes)
+                        tileView.scaleType = ImageView.ScaleType.CENTER_CROP
+                        frame.addView(tileView)
+                    }
+                    
                     frame.setBackgroundResource(R.drawable.cell_border)
                     
                     boardCells[r][c] = frame
@@ -187,49 +311,45 @@ class GameFragment : Fragment() {
     }
 
     private fun createUnit(r: Int, c: Int, team: Int, typeIndex: Int) {
-        val type = when (typeIndex % 4) {
-            0 -> UnitType.INFANTRY
-            1 -> UnitType.BAZOOKA
-            2 -> UnitType.TANK
-            else -> UnitType.PLANE
-        }
+        val type = UnitType.values()[typeIndex % 4]
         val unit = GameUnit(type, team, r, c, type.maxHP, type.maxHP)
-        val unitView = addUnitToUI(boardCells[r][c]!!, if (team == 0) Color.RED else Color.BLUE, getUnitIcon(typeIndex))
+        val unitView = addUnitToUI(boardCells[r][c]!!, team, type)
         unit.view = unitView
         units.add(unit)
     }
 
-    private fun addUnitToUI(container: FrameLayout, color: Int, iconRes: Int): ImageView {
+    private fun addUnitToUI(container: FrameLayout, team: Int, type: UnitType): ImageView {
         val unitView = ImageView(requireContext())
-        val size = (resources.displayMetrics.density * 32).toInt()
+        val size = (resources.displayMetrics.density * 56).toInt()
         val params = FrameLayout.LayoutParams(size, size)
         params.gravity = Gravity.CENTER
         unitView.layoutParams = params
-        unitView.setBackgroundColor(color)
-        unitView.setImageResource(iconRes)
-        unitView.setPadding(8, 8, 8, 8)
+        
+        val teamStr = if (team == 0) "red" else "blue"
+        val resName = "${type.prefix}still${teamStr}1"
+        val resId = resources.getIdentifier(resName, "drawable", requireContext().packageName)
+        if (resId != 0) {
+            unitView.setImageResource(resId)
+        }
+        
+        unitView.setPadding(4, 4, 4, 4)
         unitView.isClickable = false
         container.addView(unitView)
         return unitView
     }
 
-    private fun getUnitIcon(index: Int): Int {
-        return when (index % 4) {
-            0 -> android.R.drawable.ic_menu_info_details
-            1 -> android.R.drawable.ic_menu_gallery
-            2 -> android.R.drawable.ic_menu_camera
-            else -> android.R.drawable.ic_menu_compass
-        }
-    }
-
     private fun onCellClicked(r: Int, c: Int) {
+        if (isInteractionLocked) return
+
         if (isWaitingForSecondary) {
             if (Pair(r, c) in abilityTiles) {
                 val target = units.find { it.r == r && it.c == c }
                 if (target != null) {
                     executeSecondaryAbility(selectedUnit!!, target)
-                    selectedUnit?.hasActed = true
-                    selectedUnit?.let { grayOutUnit(it) }
+                    selectedUnit?.let { u -> 
+                        u.hasActed = true
+                        grayOutUnit(u)
+                    }
                     finishUnitTurn()
                     return
                 }
@@ -242,14 +362,20 @@ class GameFragment : Fragment() {
             if (Pair(r, c) in attackableTiles) {
                 val target = units.find { it.r == r && it.c == c && it.team != currentTeam }
                 target?.let {
-                    it.health -= selectedUnit?.attackPower ?: 3
+                    var damage = selectedUnit?.attackPower ?: 3
+                    if (getTileTypeAt(it.r, it.c) == 2) {
+                        damage = (damage * 0.5).toInt().coerceAtLeast(1)
+                    }
+                    it.health -= damage
                     if (it.health <= 0) {
                         it.view?.let { view -> (view.parent as? ViewGroup)?.removeView(view) }
                         units.remove(it)
                         checkVictory()
                     }
-                    selectedUnit?.hasActed = true
-                    selectedUnit?.let { u -> grayOutUnit(u) }
+                    selectedUnit?.let { u ->
+                        u.hasActed = true
+                        grayOutUnit(u)
+                    }
                     finishUnitTurn()
                     return
                 }
@@ -271,7 +397,6 @@ class GameFragment : Fragment() {
         if (selectedUnit != null) {
             if (Pair(r, c) in reachableTiles && !selectedUnit!!.hasMoved) {
                 moveUnit(selectedUnit!!, r, c)
-                showActionUI()
             } else if (r == selectedUnit!!.r && c == selectedUnit!!.c) {
                 showActionUI()
             } else {
@@ -319,10 +444,28 @@ class GameFragment : Fragment() {
     private fun moveUnitDirectly(unit: GameUnit, newR: Int, newC: Int) {
         val oldFrame = boardCells[unit.r][unit.c]
         val newFrame = boardCells[newR][newC]
-        unit.view?.let {
-            oldFrame?.removeView(it)
-            newFrame?.addView(it)
-        }
+        val unitView = unit.view ?: return
+
+
+        val cellSize = oldFrame?.width?.toFloat() ?: 0f
+        val deltaX = (unit.c - newC) * cellSize
+        val deltaY = (unit.r - newR) * cellSize
+
+
+        oldFrame?.removeView(unitView)
+        newFrame?.addView(unitView)
+
+
+        unitView.translationX = deltaX
+        unitView.translationY = deltaY
+
+
+        unitView.animate()
+            .translationX(0f)
+            .translationY(0f)
+            .setDuration(400)
+            .start()
+
         unit.r = newR
         unit.c = newC
     }
@@ -385,13 +528,17 @@ class GameFragment : Fragment() {
                     val nr = neighbor.first
                     val nc = neighbor.second
                     if (nr in 0 until rows && nc in 0 until cols) {
-                        val unitAtNeighbor = units.find { it.r == nr && it.c == nc }
-                        if (unitAtNeighbor == null || unitAtNeighbor.team == unit.team) {
+                        val tileType = getTileTypeAt(nr, nc)
+                        val canCross = when (tileType) {
+                            3 -> false
+                            4 -> unit.type == UnitType.PLANE
+                            else -> true
+                        }
+                        
+                        if (canCross && units.none { it.r == nr && it.c == nc } && visited[Pair(nr, nc)] == null) {
                             val nextDist = dist + 1
-                            if (visited[Pair(nr, nc)] == null || visited[Pair(nr, nc)]!! > nextDist) {
-                                visited[Pair(nr, nc)] = nextDist
-                                queue.add(Triple(nr, nc, nextDist))
-                            }
+                            visited[Pair(nr, nc)] = nextDist
+                            queue.add(Triple(nr, nc, nextDist))
                         }
                     }
                 }
@@ -455,10 +602,87 @@ class GameFragment : Fragment() {
     }
 
     private fun moveUnit(unit: GameUnit, newR: Int, newC: Int) {
-        moveUnitDirectly(unit, newR, newC)
-        unit.hasMoved = true
+        val path = findPath(unit, Pair(unit.r, unit.c), Pair(newR, newC))
+        if (path.size <= 1) {
+            unit.hasMoved = true
+            showActionUI()
+            return
+        }
+
         clearHighlights()
         reachableTiles.clear()
+        isInteractionLocked = true
+        
+        animatePath(unit, path, 1) {
+            unit.hasMoved = true
+            isInteractionLocked = false
+            showActionUI()
+        }
+    }
+
+    private fun findPath(unit: GameUnit, start: Pair<Int, Int>, target: Pair<Int, Int>): List<Pair<Int, Int>> {
+        val queue: Queue<List<Pair<Int, Int>>> = LinkedList()
+        queue.add(listOf(start))
+        val visited = mutableSetOf(start)
+        
+        while (queue.isNotEmpty()) {
+            val path = queue.poll()!!
+            val current = path.last()
+            
+            if (current == target) return path
+            
+            val neighbors = listOf(
+                Pair(current.first - 1, current.second),
+                Pair(current.first + 1, current.second),
+                Pair(current.first, current.second - 1),
+                Pair(current.first, current.second + 1)
+            )
+            
+            for (n in neighbors) {
+                if (n.first in 0 until rows && n.second in 0 until cols && n !in visited) {
+                    val tileType = getTileTypeAt(n.first, n.second)
+                    val canCross = when (tileType) {
+                        3 -> false
+                        4 -> unit.type == UnitType.PLANE
+                        else -> true
+                    }
+                    val isOccupied = units.any { it.r == n.first && it.c == n.second && it != unit }
+                    
+                    if (canCross && !isOccupied) {
+                        visited.add(n)
+                        queue.add(path + n)
+                    }
+                }
+            }
+        }
+        return listOf(start)
+    }
+
+    private fun animatePath(unit: GameUnit, path: List<Pair<Int, Int>>, index: Int, onComplete: () -> Unit) {
+        if (index >= path.size) {
+            unit.state = UnitState.STILL
+            updateUnitsAnimations()
+            onComplete()
+            return
+        }
+
+        val prev = path[index - 1]
+        val curr = path[index]
+        
+        unit.state = when {
+            curr.first < prev.first -> UnitState.UP
+            curr.first > prev.first -> UnitState.DOWN
+            curr.second < prev.second -> UnitState.LEFT
+            curr.second > prev.second -> UnitState.RIGHT
+            else -> UnitState.STILL
+        }
+        updateUnitsAnimations()
+        
+        moveUnitDirectly(unit, curr.first, curr.second)
+        
+        handler.postDelayed({
+            animatePath(unit, path, index + 1, onComplete)
+        }, 500)
     }
 
     private fun showActionUI() {
@@ -489,7 +713,7 @@ class GameFragment : Fragment() {
     }
 
     private fun executeAiTurn() {
-        if (units.none { it.team == 1 }) return // Player already lost
+        if (units.none { it.team == 1 }) return
 
         val aiUnits = units.filter { it.team == 0 && !it.hasActed }
         if (aiUnits.isEmpty()) {
@@ -502,14 +726,14 @@ class GameFragment : Fragment() {
         val enemyUnits = units.filter { it.team == 1 }
 
         val movePos = findAiMovePosition(unit, enemyUnits, difficulty != "Fácil")
-        moveUnitDirectly(unit, movePos.first, movePos.second)
+        val path = findPath(unit, Pair(unit.r, unit.c), movePos)
         
-        aiAttackIfPossible(unit, enemyUnits)
-
-        unit.hasActed = true
-        grayOutUnit(unit)
-        
-        Handler(Looper.getMainLooper()).postDelayed({ executeAiTurn() }, 800)
+        animatePath(unit, path, 1) {
+            aiAttackIfPossible(unit, enemyUnits)
+            unit.hasActed = true
+            grayOutUnit(unit)
+            handler.postDelayed({ executeAiTurn() }, 800)
+        }
     }
 
     private fun findAiMovePosition(unit: GameUnit, enemies: List<GameUnit>, aggressive: Boolean): Pair<Int, Int> {
@@ -524,7 +748,13 @@ class GameFragment : Fragment() {
             if (dist < unit.type.moveRange) {
                 for (n in arrayOf(Pair(currR-1, currC), Pair(currR+1, currC), Pair(currR, currC-1), Pair(currR, currC+1))) {
                     if (n.first in 0 until rows && n.second in 0 until cols) {
-                        if (units.none { it.r == n.first && it.c == n.second } && visited[n] == null) {
+                        val tileType = getTileTypeAt(n.first, n.second)
+                        val canCross = when (tileType) {
+                            3 -> false
+                            4 -> unit.type == UnitType.PLANE
+                            else -> true
+                        }
+                        if (canCross && units.none { it.r == n.first && it.c == n.second } && visited[n] == null) {
                             visited[n] = dist + 1
                             queue.add(Triple(n.first, n.second, dist + 1))
                         }
@@ -546,7 +776,11 @@ class GameFragment : Fragment() {
             dist <= unit.type.attackRange
         }
         target?.let {
-            it.health -= unit.attackPower
+            var damage = unit.attackPower
+            if (getTileTypeAt(it.r, it.c) == 2) {
+                damage = (damage * 0.5).toInt().coerceAtLeast(1)
+            }
+            it.health -= damage
             if (it.health <= 0) {
                 it.view?.let { view -> (view.parent as? ViewGroup)?.removeView(view) }
                 units.remove(it)
@@ -567,22 +801,18 @@ class GameFragment : Fragment() {
     }
 
     private fun navigateToVictory(winnerTeam: Int) {
+        handler.removeCallbacks(animationRunnable)
         parentFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, VictoryFragment.newInstance(winnerTeam))
             .commit()
     }
 
     private fun grayOutUnit(unit: GameUnit) {
-        val matrix = ColorMatrix()
-        matrix.setSaturation(0f)
-        val filter = ColorMatrixColorFilter(matrix)
-        unit.view?.colorFilter = filter
-        unit.view?.setBackgroundColor(Color.GRAY)
+        unit.hasActed = true
+        unit.view?.colorFilter = null
     }
 
     private fun resetUnitAppearance(unit: GameUnit) {
         unit.view?.colorFilter = null
-        val originalColor = if (unit.team == 0) Color.RED else Color.BLUE
-        unit.view?.setBackgroundColor(originalColor)
     }
 }

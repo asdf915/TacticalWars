@@ -13,7 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
-        android:src="@drawable/fondo" />
+        android:src="@drawable/background4" />
 
     <TextView
         android:id="@+id/tvTitle"
@@ -66,75 +66,59 @@
 
         <ImageView
             android:id="@+id/redUnit1"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_margin="4dp"
-            android:alpha="0"
-            android:background="#FF0000"
-            android:src="@android:drawable/ic_menu_info_details" />
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="8dp"
+            android:alpha="0" />
 
         <ImageView
             android:id="@+id/redUnit2"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_margin="4dp"
-            android:alpha="0"
-            android:background="#FF0000"
-            android:src="@android:drawable/ic_menu_gallery" />
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="8dp"
+            android:alpha="0" />
 
         <ImageView
             android:id="@+id/redUnit3"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_margin="4dp"
-            android:alpha="0"
-            android:background="#FF0000"
-            android:src="@android:drawable/ic_menu_camera" />
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="8dp"
+            android:alpha="0" />
 
         <ImageView
             android:id="@+id/redUnit4"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_margin="4dp"
-            android:alpha="0"
-            android:background="#FF0000"
-            android:src="@android:drawable/ic_menu_compass" />
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="8dp"
+            android:alpha="0" />
 
         <ImageView
             android:id="@+id/blueUnit1"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_margin="4dp"
-            android:alpha="0"
-            android:background="#0000FF"
-            android:src="@android:drawable/ic_menu_info_details" />
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="8dp"
+            android:alpha="0" />
 
         <ImageView
             android:id="@+id/blueUnit2"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_margin="4dp"
-            android:alpha="0"
-            android:background="#0000FF"
-            android:src="@android:drawable/ic_menu_gallery" />
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="8dp"
+            android:alpha="0" />
 
         <ImageView
             android:id="@+id/blueUnit3"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_margin="4dp"
-            android:alpha="0"
-            android:background="#0000FF"
-            android:src="@android:drawable/ic_menu_camera" />
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="8dp"
+            android:alpha="0" />
 
         <ImageView
             android:id="@+id/blueUnit4"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_margin="4dp"
-            android:alpha="0"
-            android:background="#0000FF"
-            android:src="@android:drawable/ic_menu_compass" />
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_margin="8dp"
+            android:alpha="0" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

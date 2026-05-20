@@ -51,17 +51,17 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Red Units Lane -->
     <LinearLayout
-        android:id="@+id/llUnitLane"
+        android:id="@+id/llRedLane"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="224dp"
+        android:layout_marginBottom="250dp"
         android:clipChildren="false"
         android:clipToPadding="false"
         android:orientation="horizontal"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.333"
         app:layout_constraintStart_toStartOf="parent">
 
         <ImageView
@@ -91,6 +91,20 @@
             android:layout_height="64dp"
             android:layout_margin="8dp"
             android:alpha="0" />
+    </LinearLayout>
+
+    <!-- Blue Units Lane -->
+    <LinearLayout
+        android:id="@+id/llBlueLane"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="150dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
 
         <ImageView
             android:id="@+id/blueUnit1"

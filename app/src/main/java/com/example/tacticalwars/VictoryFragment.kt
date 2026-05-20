@@ -79,6 +79,11 @@ class VictoryFragment : Fragment() {
             unitView.setPadding(8, 8, 8, 8)
             unitView.tag = unitPrefixes[i]
             
+            // Mirror blue units so they face right
+            if (winnerTeam == 1) {
+                unitView.scaleX = -1f
+            }
+            
             llWinnerUnits.addView(unitView)
             winnerUnitViews.add(unitView)
 
@@ -105,8 +110,25 @@ class VictoryFragment : Fragment() {
         val teamStr = if (winnerTeam == 0) "red" else "blue"
         for (view in winnerUnitViews) {
             val prefix = view.tag as String
-            val resName = "${prefix}still$teamStr$currentFrame"
-            val resId = resources.getIdentifier(resName, "drawable", requireContext().packageName)
+            
+            // Try idle with frame first (e.g., infantryidleblue1)
+            var resId = resources.getIdentifier("${prefix}idle$teamStr$currentFrame", "drawable", requireContext().packageName)
+            
+            // Try idle without frame (e.g., infantryidleblue, bazookaidleblue)
+            if (resId == 0) {
+                resId = resources.getIdentifier("${prefix}idle$teamStr", "drawable", requireContext().packageName)
+            }
+            
+            // Fallback to still with frame
+            if (resId == 0) {
+                resId = resources.getIdentifier("${prefix}still$teamStr$currentFrame", "drawable", requireContext().packageName)
+            }
+            
+            // Final fallback for tank and jet (e.g., tankblue)
+            if (resId == 0) {
+                resId = resources.getIdentifier("$prefix$teamStr", "drawable", requireContext().packageName)
+            }
+
             if (resId != 0) {
                 view.setImageResource(resId)
             }

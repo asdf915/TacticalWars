@@ -23,7 +23,7 @@ import com.google.android.material.slider.Slider
 
 class HomeFragment : Fragment() {
 
-    private var animatorSet: AnimatorSet? = null
+    private var animatorSets: MutableList<AnimatorSet> = mutableListOf()
     private var mediaPlayer: MediaPlayer? = null
     private var musicVolume: Float = 0.5f
     private var sfxVolume: Float = 0.5f
@@ -39,7 +39,8 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private var unitViews: List<ImageView> = emptyList()
+    private var redUnits: List<ImageView> = emptyList()
+    private var blueUnits: List<ImageView> = emptyList()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -53,18 +54,18 @@ class HomeFragment : Fragment() {
 
         setupMusic()
 
-        val unitIds = listOf(
-            R.id.redUnit1, R.id.redUnit2, R.id.redUnit3, R.id.redUnit4,
-            R.id.blueUnit1, R.id.blueUnit2, R.id.blueUnit3, R.id.blueUnit4
-        )
-        unitViews = unitIds.map { view.findViewById<ImageView>(it) }
+        redUnits = listOf(R.id.redUnit1, R.id.redUnit2, R.id.redUnit3, R.id.redUnit4).map { view.findViewById<ImageView>(it) }
+        blueUnits = listOf(R.id.blueUnit1, R.id.blueUnit2, R.id.blueUnit3, R.id.blueUnit4).map { view.findViewById<ImageView>(it) }
 
         updateUnitImages()
         handler.post(animationRunnable)
 
         view.post {
             if (isAdded) {
-                startParade(unitViews, view.width.toFloat())
+                val screenWidth = view.width.toFloat()
+                // Blue starts immediately, Red starts with a delay of 3 seconds
+                startParade(blueUnits, R.id.llBlueLane, screenWidth, 0L)
+                startParade(redUnits, R.id.llRedLane, screenWidth, 3000L)
             }
         }
 
@@ -83,15 +84,17 @@ class HomeFragment : Fragment() {
     private fun updateUnitImages() {
         if (!isAdded) return
         val prefixes = listOf("infantry", "bazooka", "tank", "jet")
-        unitViews.forEachIndexed { index, imageView ->
-            val isRed = index < 4
-            val typeIndex = index % 4
-            val teamStr = if (isRed) "red" else "blue"
-            val resName = "${prefixes[typeIndex]}still$teamStr$currentFrame"
+        
+        redUnits.forEachIndexed { index, imageView ->
+            val resName = "${prefixes[index]}stillred$currentFrame"
             val resId = resources.getIdentifier(resName, "drawable", requireContext().packageName)
-            if (resId != 0) {
-                imageView.setImageResource(resId)
-            }
+            if (resId != 0) imageView.setImageResource(resId)
+        }
+        
+        blueUnits.forEachIndexed { index, imageView ->
+            val resName = "${prefixes[index]}stillblue$currentFrame"
+            val resId = resources.getIdentifier(resName, "drawable", requireContext().packageName)
+            if (resId != 0) imageView.setImageResource(resId)
         }
     }
 
@@ -140,10 +143,10 @@ class HomeFragment : Fragment() {
         dialog.show()
     }
 
-    private fun startParade(units: List<View>, screenWidth: Float) {
+    private fun startParade(units: List<View>, laneId: Int, screenWidth: Float, initialDelay: Long) {
         if (!isAdded || view == null) return
 
-        val lane = view?.findViewById<View>(R.id.llUnitLane) ?: return
+        val lane = view?.findViewById<View>(laneId) ?: return
         val laneLeft = lane.left.toFloat()
 
         val animators = units.mapIndexed { index, unit ->
@@ -156,22 +159,23 @@ class HomeFragment : Fragment() {
 
             ObjectAnimator.ofFloat(unit, "translationX", startX, endX).apply {
                 duration = 8000 
-                startDelay = index * 1500L 
+                startDelay = initialDelay + (index * 1500L)
                 interpolator = LinearInterpolator()
             }
         }
 
-        animatorSet = AnimatorSet().apply {
+        val animatorSet = AnimatorSet().apply {
             playTogether(animators)
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
                     view?.postDelayed({
-                        if (isAdded) startParade(units, screenWidth)
+                        if (isAdded) startParade(units, laneId, screenWidth, 0L)
                     }, 3000L)
                 }
             })
             start()
         }
+        animatorSets.add(animatorSet)
     }
 
     override fun onResume() {
@@ -186,7 +190,8 @@ class HomeFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        animatorSet?.cancel()
+        animatorSets.forEach { it.cancel() }
+        animatorSets.clear()
         handler.removeCallbacks(animationRunnable)
         mediaPlayer?.release()
         mediaPlayer = null

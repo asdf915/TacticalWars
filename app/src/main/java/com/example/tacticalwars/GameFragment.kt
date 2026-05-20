@@ -1,8 +1,6 @@
 package com.example.tacticalwars
 
 import android.graphics.Color
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -40,6 +38,7 @@ class GameFragment : Fragment() {
     private var isWaitingForAction = false
     private var isWaitingForSecondary = false
     private var isInteractionLocked = false
+    private var isBattleInProgress = false
 
     private lateinit var tvTurnTitle: TextView
     private lateinit var tvHealthInfo: TextView
@@ -70,7 +69,7 @@ class GameFragment : Fragment() {
 
     data class GameUnit(
         val type: UnitType,
-        val team: Int, // 0: Rojo, 1: Azul
+        val team: Int,
         var r: Int,
         var c: Int,
         var health: Int,
@@ -206,6 +205,15 @@ class GameFragment : Fragment() {
             selectedUnit?.let { showSecondaryRange(it) }
         }
 
+        parentFragmentManager.setFragmentResultListener("battle_done", viewLifecycleOwner) { _, _ ->
+            isBattleInProgress = false
+            checkUnitDeaths()
+            finishUnitTurn()
+            if (isAiMode && currentTeam == 0) {
+                handler.postDelayed({ executeAiTurn() }, 500)
+            }
+        }
+
         handler.post(animationRunnable)
     }
 
@@ -263,35 +271,48 @@ class GameFragment : Fragment() {
     }
 
     private fun setupBoard(gridLayout: GridLayout) {
+
+        gridLayout.removeAllViews()
         gridLayout.rowCount = rows
         gridLayout.columnCount = cols
+
+
+        gridLayout.clipChildren = false
+        gridLayout.clipToPadding = false
 
         gridLayout.post {
             val cellWidth = gridLayout.width / cols
             val cellHeight = gridLayout.height / rows
             val cellSize = Math.min(cellWidth, cellHeight)
 
+            if (cellSize <= 0) return@post
+
             for (r in 0 until rows) {
                 for (c in 0 until cols) {
                     val frame = FrameLayout(requireContext())
+
+
+                    frame.clipChildren = false
+
                     val params = GridLayout.LayoutParams()
                     params.rowSpec = GridLayout.spec(r)
                     params.columnSpec = GridLayout.spec(c)
                     params.width = cellSize
                     params.height = cellSize
                     frame.layoutParams = params
-                    
+
                     if (selectedMapId in 1..3) {
                         val tileRes = getTileRes(selectedMapId, r * cols + c)
                         val tileView = ImageView(requireContext())
+                        tileView.tag = "tile"
                         tileView.layoutParams = FrameLayout.LayoutParams(cellSize, cellSize)
                         tileView.setImageResource(tileRes)
                         tileView.scaleType = ImageView.ScaleType.CENTER_CROP
                         frame.addView(tileView)
                     }
-                    
+
                     frame.setBackgroundResource(R.drawable.cell_border)
-                    
+
                     boardCells[r][c] = frame
                     gridLayout.addView(frame)
 
@@ -303,9 +324,20 @@ class GameFragment : Fragment() {
                 }
             }
 
-            for (c in 1..4) {
-                createUnit(0, c, 0, c - 1)
-                createUnit(7, c, 1, c - 1)
+            if (units.isEmpty()) {
+                for (c in 1..4) {
+                    createUnit(0, c, 0, c - 1)
+                    createUnit(7, c, 1, c - 1)
+                }
+            } else {
+                for (unit in units) {
+                    val frame = boardCells[unit.r][unit.c]
+                    unit.view?.let {
+                        val parent = it.parent as? ViewGroup
+                        parent?.removeView(it)
+                        frame?.addView(it)
+                    }
+                }
             }
         }
     }
@@ -339,7 +371,7 @@ class GameFragment : Fragment() {
     }
 
     private fun onCellClicked(r: Int, c: Int) {
-        if (isInteractionLocked) return
+        if (isInteractionLocked || isBattleInProgress) return
 
         if (isWaitingForSecondary) {
             if (Pair(r, c) in abilityTiles) {
@@ -366,17 +398,7 @@ class GameFragment : Fragment() {
                     if (getTileTypeAt(it.r, it.c) == 2) {
                         damage = (damage * 0.5).toInt().coerceAtLeast(1)
                     }
-                    it.health -= damage
-                    if (it.health <= 0) {
-                        it.view?.let { view -> (view.parent as? ViewGroup)?.removeView(view) }
-                        units.remove(it)
-                        checkVictory()
-                    }
-                    selectedUnit?.let { u ->
-                        u.hasActed = true
-                        grayOutUnit(u)
-                    }
-                    finishUnitTurn()
+                    startBattle(selectedUnit!!, it, damage)
                     return
                 }
             } else {
@@ -408,6 +430,37 @@ class GameFragment : Fragment() {
         } else if (unitAtCell != null && unitAtCell.team == currentTeam && !unitAtCell.hasActed) {
             selectUnit(unitAtCell)
         }
+    }
+
+    private fun startBattle(attacker: GameUnit, target: GameUnit, damage: Int) {
+        isBattleInProgress = true
+        val battleFragment = BattleFragment.newInstance(
+            attacker.type.prefix, attacker.team, attacker.type.maxHP, attacker.health,
+            target.type.prefix, target.team, target.type.maxHP, target.health,
+            damage
+        )
+        
+
+        target.health -= damage
+        attacker.hasActed = true
+        grayOutUnit(attacker)
+
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, battleFragment)
+            .addToBackStack(null)
+            .commit()
+    }
+
+    private fun checkUnitDeaths() {
+        val iterator = units.iterator()
+        while (iterator.hasNext()) {
+            val unit = iterator.next()
+            if (unit.health <= 0) {
+                unit.view?.let { view -> (view.parent as? ViewGroup)?.removeView(view) }
+                iterator.remove()
+            }
+        }
+        checkVictory()
     }
 
     private fun executeSecondaryAbility(user: GameUnit, target: GameUnit) {
@@ -446,24 +499,27 @@ class GameFragment : Fragment() {
         val newFrame = boardCells[newR][newC]
         val unitView = unit.view ?: return
 
-
         val cellSize = oldFrame?.width?.toFloat() ?: 0f
         val deltaX = (unit.c - newC) * cellSize
         val deltaY = (unit.r - newR) * cellSize
-
 
         oldFrame?.removeView(unitView)
         newFrame?.addView(unitView)
 
 
+        newFrame?.elevation = 100f
+
         unitView.translationX = deltaX
         unitView.translationY = deltaY
-
 
         unitView.animate()
             .translationX(0f)
             .translationY(0f)
             .setDuration(400)
+            .withEndAction {
+
+                newFrame?.elevation = 0f
+            }
             .start()
 
         unit.r = newR
@@ -584,11 +640,16 @@ class GameFragment : Fragment() {
     }
 
     private fun highlightCell(r: Int, c: Int, color: Int) {
-        val frame = boardCells[r][c]
+        val frame = boardCells[r][c] ?: return
         val highlight = View(requireContext())
         highlight.tag = "highlight"
         highlight.setBackgroundColor(color)
-        frame?.addView(highlight, 0)
+        
+        var insertIndex = 0
+        if (frame.childCount > 0 && frame.getChildAt(0).tag == "tile") {
+            insertIndex = 1
+        }
+        frame.addView(highlight, insertIndex)
     }
 
     private fun clearHighlights() {
@@ -698,6 +759,8 @@ class GameFragment : Fragment() {
     }
 
     private fun checkTurnEnd() {
+        if (isBattleInProgress) return
+
         val currentTeamUnits = units.filter { it.team == currentTeam }
         if (currentTeamUnits.isNotEmpty() && currentTeamUnits.all { it.hasActed }) {
             currentTeam = 1 - currentTeam
@@ -707,13 +770,13 @@ class GameFragment : Fragment() {
                 resetUnitAppearance(it)
             }
             if (isAiMode && currentTeam == 0) {
-                Handler(Looper.getMainLooper()).postDelayed({ executeAiTurn() }, 1000)
+                handler.postDelayed({ executeAiTurn() }, 1000)
             }
         }
     }
 
     private fun executeAiTurn() {
-        if (units.none { it.team == 1 }) return
+        if (isBattleInProgress || units.none { it.team == 1 }) return
 
         val aiUnits = units.filter { it.team == 0 && !it.hasActed }
         if (aiUnits.isEmpty()) {
@@ -730,9 +793,11 @@ class GameFragment : Fragment() {
         
         animatePath(unit, path, 1) {
             aiAttackIfPossible(unit, enemyUnits)
-            unit.hasActed = true
-            grayOutUnit(unit)
-            handler.postDelayed({ executeAiTurn() }, 800)
+            if (!isBattleInProgress) {
+                unit.hasActed = true
+                grayOutUnit(unit)
+                handler.postDelayed({ executeAiTurn() }, 800)
+            }
         }
     }
 
@@ -780,12 +845,7 @@ class GameFragment : Fragment() {
             if (getTileTypeAt(it.r, it.c) == 2) {
                 damage = (damage * 0.5).toInt().coerceAtLeast(1)
             }
-            it.health -= damage
-            if (it.health <= 0) {
-                it.view?.let { view -> (view.parent as? ViewGroup)?.removeView(view) }
-                units.remove(it)
-                checkVictory()
-            }
+            startBattle(unit, it, damage)
         }
     }
 

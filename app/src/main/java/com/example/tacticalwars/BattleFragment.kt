@@ -1,5 +1,6 @@
 package com.example.tacticalwars
 
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -89,6 +90,16 @@ class BattleFragment : Fragment() {
         startBattleSequence()
     }
 
+    private fun playGunshotSound() {
+        try {
+            val mediaPlayer = MediaPlayer.create(requireContext(), R.raw.sonido_disparo)
+            mediaPlayer.setOnCompletionListener { it.release() }
+            mediaPlayer.start()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private fun setupInitialState() {
         // Blue is always on the left, Red on the right
         val (blueUnit, redUnit) = if (attackerTeam == 1) {
@@ -144,6 +155,7 @@ class BattleFragment : Fragment() {
             override fun run() {
                 val resId = resources.getIdentifier("fire$frame", "drawable", requireContext().packageName)
                 if (resId != 0) {
+                    if (frame == 1) playGunshotSound()
                     ivFireEffect.setImageResource(resId)
                     ivFireEffect.visibility = View.VISIBLE
                     ivFireEffect.x = targetImg.x + (targetImg.width / 4)
@@ -189,6 +201,7 @@ class BattleFragment : Fragment() {
                 }
 
                 if (resId != 0) {
+                    if (assemblyFrame == 1) playGunshotSound()
                     attackerImg.setImageResource(resId)
                     assemblyFrame++
                     handler.postDelayed(this, 500)

@@ -30,19 +30,35 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <LinearLayout
-        android:id="@+id/llWinnerUnits"
+        android:id="@+id/llWinnerUnitsContainer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:gravity="center"
         android:clipChildren="false"
         android:clipToPadding="false"
-        android:paddingTop="80dp"
-        android:paddingBottom="20dp"
         app:layout_constraintBottom_toTopOf="@+id/btnBackToHome"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tvVictoryMessage">
+
+        <LinearLayout
+            android:id="@+id/llWinnerUnitsRow1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:clipChildren="false"
+            android:clipToPadding="false" />
+
+        <LinearLayout
+            android:id="@+id/llWinnerUnitsRow2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:clipChildren="false"
+            android:clipToPadding="false" />
 
     </LinearLayout>
 

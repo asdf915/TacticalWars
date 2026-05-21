@@ -34,7 +34,7 @@ class GameFragment : Fragment() {
     private val attackableTiles = mutableSetOf<Pair<Int, Int>>()
     private val abilityTiles = mutableSetOf<Pair<Int, Int>>()
     
-    private var currentTeam: Int = 1 // 1: Azul (empieza), 0: Rojo
+    private var currentTeam: Int = 1
     private var isWaitingForAction = false
     private var isWaitingForSecondary = false
     private var isInteractionLocked = false
@@ -119,6 +119,28 @@ class GameFragment : Fragment() {
             1, 1, 1, 1, 1, 2
         )
 
+        private val MAP4_TILES = listOf(
+            1, 1, 1, 1, 2, 4,
+            4, 5, 4, 5, 4, 4,
+            4, 5, 4, 5, 4, 4,
+            2, 1, 1, 1, 2, 2,
+            1, 1, 2, 1, 1, 1,
+            4, 5, 4, 5, 4, 4,
+            4, 5, 4, 5, 4, 4,
+            4, 1, 1, 1, 1, 2
+        )
+
+        private val MAP5_TILES = listOf(
+            3, 1, 1, 1, 2, 2,
+            3, 3, 4, 1, 4, 1,
+            1, 1, 1, 1, 1, 1,
+            5, 4, 4, 5, 5, 4,
+            1, 2, 6, 1, 1, 2,
+            3, 2, 4, 1, 2, 2,
+            1, 1, 1, 1, 1, 1,
+            2, 1, 2, 2, 1, 1
+        )
+
         fun newInstance(mapId: Int, aiMode: Boolean = false, difficulty: String = "Normal"): GameFragment {
             val fragment = GameFragment()
             val args = Bundle()
@@ -147,6 +169,8 @@ class GameFragment : Fragment() {
                 1 -> if (index < MAP1_TILES.size) MAP1_TILES[index] else 1
                 2 -> if (index < MAP2_TILES.size) MAP2_TILES[index] else 1
                 3 -> if (index < MAP3_TILES.size) MAP3_TILES[index] else 1
+                4 -> if (index < MAP4_TILES.size) MAP4_TILES[index] else 1
+                5 -> if (index < MAP5_TILES.size) MAP5_TILES[index] else 1
                 else -> 1
             }
         }
@@ -180,7 +204,7 @@ class GameFragment : Fragment() {
         btnWait = view.findViewById(R.id.btnWait)
 
         val ivBackground = view.findViewById<ImageView>(R.id.ivGameBackground)
-        if (selectedMapId in 1..3) {
+        if (selectedMapId in 1..5) {
             ivBackground.visibility = View.GONE
         } else {
             ivBackground.setImageResource(R.drawable.background4)
@@ -301,7 +325,7 @@ class GameFragment : Fragment() {
                     params.height = cellSize
                     frame.layoutParams = params
 
-                    if (selectedMapId in 1..3) {
+                    if (selectedMapId in 1..5) {
                         val tileRes = getTileRes(selectedMapId, r * cols + c)
                         val tileView = ImageView(requireContext())
                         tileView.tag = "tile"

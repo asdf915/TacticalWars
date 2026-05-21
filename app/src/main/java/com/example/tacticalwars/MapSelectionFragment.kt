@@ -48,10 +48,14 @@ class MapSelectionFragment : Fragment() {
         val glPreview1 = view.findViewById<GridLayout>(R.id.glPreviewMap1)
         val glPreview2 = view.findViewById<GridLayout>(R.id.glPreviewMap2)
         val glPreview3 = view.findViewById<GridLayout>(R.id.glPreviewMap3)
+        val glPreview4 = view.findViewById<GridLayout>(R.id.glPreviewMap4)
+        val glPreview5 = view.findViewById<GridLayout>(R.id.glPreviewMap5)
 
         setupMap1Preview(glPreview1)
         setupMap2Preview(glPreview2)
         setupMap3Preview(glPreview3)
+        setupMap4Preview(glPreview4)
+        setupMap5Preview(glPreview5)
 
         view.findViewById<Button>(R.id.btnBack).setOnClickListener {
             parentFragmentManager.popBackStack()
@@ -67,6 +71,14 @@ class MapSelectionFragment : Fragment() {
 
         view.findViewById<MaterialCardView>(R.id.cardMap3).setOnClickListener {
             onMapSelected(3, switchAI.isChecked)
+        }
+
+        view.findViewById<MaterialCardView>(R.id.cardMap4).setOnClickListener {
+            onMapSelected(4, switchAI.isChecked)
+        }
+
+        view.findViewById<MaterialCardView>(R.id.cardMap5).setOnClickListener {
+            onMapSelected(5, switchAI.isChecked)
         }
     }
 
@@ -108,6 +120,34 @@ class MapSelectionFragment : Fragment() {
             1, 2, 1, 1, 1, 1,
             1, 3, 1, 1, 1, 1,
             1, 1, 1, 1, 1, 2
+        )
+        fillGridWithTiles(gridLayout, mapData)
+    }
+
+    private fun setupMap4Preview(gridLayout: GridLayout) {
+        val mapData = listOf(
+            1, 1, 1, 1, 2, 4,
+            4, 5, 4, 5, 4, 4,
+            4, 5, 4, 5, 4, 4,
+            2, 1, 1, 1, 2, 2,
+            1, 1, 2, 1, 1, 1,
+            4, 5, 4, 5, 4, 4,
+            4, 5, 4, 5, 4, 4,
+            4, 1, 1, 1, 1, 2
+        )
+        fillGridWithTiles(gridLayout, mapData)
+    }
+
+    private fun setupMap5Preview(gridLayout: GridLayout) {
+        val mapData = listOf(
+            3, 1, 1, 1, 2, 2,
+            3, 3, 4, 1, 4, 1,
+            1, 1, 1, 1, 1, 1,
+            5, 4, 4, 5, 5, 4,
+            1, 2, 6, 1, 1, 2,
+            3, 2, 4, 1, 2, 2,
+            1, 1, 1, 1, 1, 1,
+            2, 1, 2, 2, 1, 1
         )
         fillGridWithTiles(gridLayout, mapData)
     }

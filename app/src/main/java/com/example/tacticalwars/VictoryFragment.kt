@@ -60,7 +60,8 @@ class VictoryFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         val tvVictoryMessage = view.findViewById<TextView>(R.id.tvVictoryMessage)
-        val llWinnerUnits = view.findViewById<LinearLayout>(R.id.llWinnerUnits)
+        val llWinnerUnitsRow1 = view.findViewById<LinearLayout>(R.id.llWinnerUnitsRow1)
+        val llWinnerUnitsRow2 = view.findViewById<LinearLayout>(R.id.llWinnerUnitsRow2)
         val btnBackToHome = view.findViewById<Button>(R.id.btnBackToHome)
 
         val teamName = if (winnerTeam == 0) "ROJO" else "AZUL"
@@ -84,7 +85,13 @@ class VictoryFragment : Fragment() {
                 unitView.scaleX = -1f
             }
             
-            llWinnerUnits.addView(unitView)
+            // Infantry and Bazooka in Row 1 (top), Tank and Jet in Row 2 (bottom)
+            if (i < 2) {
+                llWinnerUnitsRow1.addView(unitView)
+            } else {
+                llWinnerUnitsRow2.addView(unitView)
+            }
+            
             winnerUnitViews.add(unitView)
 
             startDancingAnimation(unitView, i * 200L)
@@ -111,20 +118,20 @@ class VictoryFragment : Fragment() {
         for (view in winnerUnitViews) {
             val prefix = view.tag as String
             
-            // Try idle with frame first (e.g., infantryidleblue1)
-            var resId = resources.getIdentifier("${prefix}idle$teamStr$currentFrame", "drawable", requireContext().packageName)
+            // Priority: "still" with frame (the standard idle animation in this project)
+            var resId = resources.getIdentifier("${prefix}still$teamStr$currentFrame", "drawable", requireContext().packageName)
             
-            // Try idle without frame (e.g., infantryidleblue, bazookaidleblue)
+            // Fallback: "still" without frame
             if (resId == 0) {
-                resId = resources.getIdentifier("${prefix}idle$teamStr", "drawable", requireContext().packageName)
+                resId = resources.getIdentifier("${prefix}still$teamStr", "drawable", requireContext().packageName)
             }
-            
-            // Fallback to still with frame
+
+            // Fallback: "idle"
             if (resId == 0) {
-                resId = resources.getIdentifier("${prefix}still$teamStr$currentFrame", "drawable", requireContext().packageName)
+                resId = resources.getIdentifier("${prefix}idle$teamStr$currentFrame", "drawable", requireContext().packageName)
             }
-            
-            // Final fallback for tank and jet (e.g., tankblue)
+
+            // Final fallback
             if (resId == 0) {
                 resId = resources.getIdentifier("$prefix$teamStr", "drawable", requireContext().packageName)
             }

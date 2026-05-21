@@ -73,6 +73,13 @@ class HomeFragment : Fragment() {
             showSettingsDialog()
         }
 
+        view.findViewById<ImageButton>(R.id.btnVictoryBlue).setOnClickListener {
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, VictoryFragment.newInstance(1))
+                .addToBackStack(null)
+                .commit()
+        }
+
         view.findViewById<Button>(R.id.btnStart).setOnClickListener {
             parentFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, MapSelectionFragment.newInstance(difficulty))

@@ -1,5 +1,6 @@
 package com.example.tacticalwars
 
+import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.Handler
@@ -91,17 +92,27 @@ class BattleFragment : Fragment() {
     }
 
     private fun playGunshotSound() {
-        try {
-            val mediaPlayer = MediaPlayer.create(requireContext(), R.raw.sonido_disparo)
-            mediaPlayer.setOnCompletionListener { it.release() }
-            mediaPlayer.start()
-        } catch (e: Exception) {
-            e.printStackTrace()
+        context?.let { ctx ->
+            try {
+                val mediaPlayer = MediaPlayer.create(ctx, R.raw.sonido_disparo)
+                mediaPlayer?.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_GAME)
+                        .build()
+                )
+                mediaPlayer?.setOnCompletionListener { 
+                    it.stop()
+                    it.release() 
+                }
+                mediaPlayer?.start()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     private fun setupInitialState() {
-        // Blue is always on the left, Red on the right
         val (blueUnit, redUnit) = if (attackerTeam == 1) {
             Pair(attackerType, targetType)
         } else {
@@ -111,9 +122,6 @@ class BattleFragment : Fragment() {
         ivUnitBlue.setImageResource(getIdleRes(blueUnit, 1))
         ivUnitRed.setImageResource(getIdleRes(redUnit, 0))
 
-        pbHealthBlue.max = attackerMaxHP * 10
-        pbHealthRed.max = targetMaxHP * 10
-        
         if (attackerTeam == 1) {
             pbHealthBlue.max = attackerMaxHP * 10
             pbHealthBlue.progress = attackerCurrentHP * 10
@@ -129,10 +137,8 @@ class BattleFragment : Fragment() {
 
     private fun getIdleRes(type: String, team: Int): Int {
         val teamStr = if (team == 0) "red" else "blue"
-        // Try infantryidleblue/red directly as requested
         var resId = resources.getIdentifier("${type}idle${teamStr}", "drawable", requireContext().packageName)
         if (resId == 0) {
-            // Try tankred, jetblue etc.
             resId = resources.getIdentifier("$type$teamStr", "drawable", requireContext().packageName)
         }
         return resId
@@ -153,9 +159,13 @@ class BattleFragment : Fragment() {
         var frame = 1
         val fireRunnable = object : Runnable {
             override fun run() {
-                val resId = resources.getIdentifier("fire$frame", "drawable", requireContext().packageName)
+                val resName = "fire$frame"
+                val resId = resources.getIdentifier(resName, "drawable", requireContext().packageName)
+                
+                // Siempre intentamos reproducir el sonido en el primer frame de la acción
+                if (frame == 1) playGunshotSound()
+
                 if (resId != 0) {
-                    if (frame == 1) playGunshotSound()
                     ivFireEffect.setImageResource(resId)
                     ivFireEffect.visibility = View.VISIBLE
                     ivFireEffect.x = targetImg.x + (targetImg.width / 4)
@@ -186,7 +196,6 @@ class BattleFragment : Fragment() {
     }
 
     private fun startAssemblyAnimation(attackerImg: ImageView, teamStr: String, targetImg: ImageView, targetPb: ProgressBar) {
-        // Increase scale for assembly sprites
         val originalScaleX = attackerImg.scaleX
         val originalScaleY = attackerImg.scaleY
         attackerImg.scaleX = originalScaleX * 1.5f
@@ -200,17 +209,16 @@ class BattleFragment : Fragment() {
                     resId = resources.getIdentifier("assembly${attackerType}aim$teamStr$assemblyFrame", "drawable", requireContext().packageName)
                 }
 
+                if (assemblyFrame == 1) playGunshotSound()
+
                 if (resId != 0) {
-                    if (assemblyFrame == 1) playGunshotSound()
                     attackerImg.setImageResource(resId)
                     assemblyFrame++
                     handler.postDelayed(this, 500)
                 } else {
-                    // Restore original scale and back to idle
                     attackerImg.scaleX = originalScaleX
                     attackerImg.scaleY = originalScaleY
                     attackerImg.setImageResource(getIdleRes(attackerType, attackerTeam))
-                    // Target flashes and health decreases
                     applyDamageAnimation(targetImg, targetPb)
                 }
             }

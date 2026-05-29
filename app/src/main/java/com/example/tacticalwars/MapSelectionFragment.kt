@@ -98,7 +98,7 @@ class MapSelectionFragment : Fragment() {
 
     private fun setupMap2Preview(gridLayout: GridLayout) {
         val mapData = listOf(
-            1, 1, 1, 4, 4, 4,
+            1, 1, 1, 1, 4, 4,
             1, 1, 2, 4, 4, 4,
             4, 5, 4, 4, 1, 1,
             1, 1, 1, 6, 1, 1,

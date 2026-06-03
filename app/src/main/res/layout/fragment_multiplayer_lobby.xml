@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#1a1a2e"
+    android:padding="24dp">
+
+    <LinearLayout
+        android:id="@+id/layoutMenu"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="visible">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="MULTIJUGADOR"
+            android:textColor="#e94560"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Juega con un amigo en tiempo real"
+            android:textColor="#8888aa"
+            android:textSize="14sp"
+            android:layout_marginBottom="40dp" />
+
+        <Button
+            android:id="@+id/btnCreateGame"
+            android:layout_width="220dp"
+            android:layout_height="52dp"
+            android:text="CREAR PARTIDA"
+            android:textColor="#ffffff"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            android:backgroundTint="#e94560"
+            android:layout_marginBottom="16dp" />
+
+        <Button
+            android:id="@+id/btnJoinGame"
+            android:layout_width="220dp"
+            android:layout_height="52dp"
+            android:text="UNIRSE A PARTIDA"
+            android:textColor="#e94560"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            android:backgroundTint="#2a2a4a"
+            android:layout_marginBottom="32dp" />
+
+        <Button
+            android:id="@+id/btnBack"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← Volver"
+            android:textColor="#8888aa"
+            android:backgroundTint="@android:color/transparent"
+            android:elevation="0dp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/layoutCreate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ELIGE EL MAPA"
+            android:textColor="#ffffff"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.12"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="El rival jugará en el mismo mapa"
+            android:textColor="#8888aa"
+            android:textSize="13sp"
+            android:layout_marginBottom="32dp" />
+
+        <Button
+            android:id="@+id/btnMap1"
+            android:layout_width="220dp"
+            android:layout_height="48dp"
+            android:text="Mapa 1 — Llanura"
+            android:textColor="#ffffff"
+            android:backgroundTint="#16213e"
+            android:layout_marginBottom="10dp" />
+
+        <Button
+            android:id="@+id/btnMap2"
+            android:layout_width="220dp"
+            android:layout_height="48dp"
+            android:text="Mapa 2 — Archipiélago"
+            android:textColor="#ffffff"
+            android:backgroundTint="#16213e"
+            android:layout_marginBottom="10dp" />
+
+        <Button
+            android:id="@+id/btnMap3"
+            android:layout_width="220dp"
+            android:layout_height="48dp"
+            android:text="Mapa 3 — Río"
+            android:textColor="#ffffff"
+            android:backgroundTint="#16213e"
+            android:layout_marginBottom="10dp" />
+
+        <Button
+            android:id="@+id/btnMap4"
+            android:layout_width="220dp"
+            android:layout_height="48dp"
+            android:text="Mapa 4 — Canales"
+            android:textColor="#ffffff"
+            android:backgroundTint="#16213e"
+            android:layout_marginBottom="10dp" />
+
+        <Button
+            android:id="@+id/btnMap5"
+            android:layout_width="220dp"
+            android:layout_height="48dp"
+            android:text="Mapa 5 — Montañas"
+            android:textColor="#ffffff"
+            android:backgroundTint="#16213e"
+            android:layout_marginBottom="28dp" />
+
+        <Button
+            android:id="@+id/btnCancelCreate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← Cancelar"
+            android:textColor="#8888aa"
+            android:backgroundTint="@android:color/transparent"
+            android:elevation="0dp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/layoutJoin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="INTRODUCE EL CÓDIGO"
+            android:textColor="#ffffff"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.12"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Pídele el código de 6 letras a tu rival"
+            android:textColor="#8888aa"
+            android:textSize="13sp"
+            android:layout_marginBottom="32dp" />
+
+        <EditText
+            android:id="@+id/etGameCode"
+            android:layout_width="220dp"
+            android:layout_height="56dp"
+            android:hint="Ej: AB3K7R"
+            android:textColor="#ffffff"
+            android:textColorHint="#555577"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:letterSpacing="0.2"
+            android:inputType="textCapCharacters"
+            android:maxLength="6"
+            android:backgroundTint="#2a2a4a"
+            android:layout_marginBottom="20dp" />
+
+        <Button
+            android:id="@+id/btnJoinConfirm"
+            android:layout_width="220dp"
+            android:layout_height="52dp"
+            android:text="UNIRSE"
+            android:textColor="#ffffff"
+            android:textStyle="bold"
+            android:backgroundTint="#e94560"
+            android:layout_marginBottom="16dp" />
+
+        <Button
+            android:id="@+id/btnCancelJoin"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← Cancelar"
+            android:textColor="#8888aa"
+            android:backgroundTint="@android:color/transparent"
+            android:elevation="0dp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/layoutWaiting"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="CÓDIGO DE SALA"
+            android:textColor="#8888aa"
+            android:textSize="13sp"
+            android:letterSpacing="0.15"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tvGameCode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="------"
+            android:textColor="#e94560"
+            android:textSize="48sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.3"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Dile este código a tu rival"
+            android:textColor="#8888aa"
+            android:textSize="13sp"
+            android:layout_marginBottom="36dp" />
+
+        <ProgressBar
+            android:id="@+id/progressWaiting"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:indeterminateTint="#e94560"
+            android:layout_marginBottom="16dp"
+            android:visibility="visible" />
+
+        <TextView
+            android:id="@+id/tvWaitingStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Esperando al rival..."
+            android:textColor="#8888aa"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+</FrameLayout>

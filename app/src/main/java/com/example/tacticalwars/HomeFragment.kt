@@ -91,13 +91,13 @@ class HomeFragment : Fragment() {
     private fun updateUnitImages() {
         if (!isAdded) return
         val prefixes = listOf("infantry", "bazooka", "tank", "jet")
-        
+
         redUnits.forEachIndexed { index, imageView ->
             val resName = "${prefixes[index]}stillred$currentFrame"
             val resId = resources.getIdentifier(resName, "drawable", requireContext().packageName)
             if (resId != 0) imageView.setImageResource(resId)
         }
-        
+
         blueUnits.forEachIndexed { index, imageView ->
             val resName = "${prefixes[index]}stillblue$currentFrame"
             val resId = resources.getIdentifier(resName, "drawable", requireContext().packageName)
@@ -127,7 +127,7 @@ class HomeFragment : Fragment() {
         sliderMusic.value = musicVolume
         sliderSFX.value = sfxVolume
 
-        val difficulties = arrayOf("Fácil", "Normal", "Difícil", "Experto")
+        val difficulties = arrayOf("Fácil", "Normal", "Difícil")
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, difficulties)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinnerDifficulty.adapter = adapter
@@ -137,9 +137,9 @@ class HomeFragment : Fragment() {
             musicVolume = sliderMusic.value
             sfxVolume = sliderSFX.value
             difficulty = spinnerDifficulty.selectedItem.toString()
-            
+
             mediaPlayer?.setVolume(musicVolume, musicVolume)
-            
+
             dialog.dismiss()
         }
 
@@ -160,12 +160,12 @@ class HomeFragment : Fragment() {
             val unitAbsoluteLeft = laneLeft + unit.left
             val startX = screenWidth - unitAbsoluteLeft
             val endX = -unitAbsoluteLeft - unit.width.toFloat()
-            
+
             unit.translationX = startX
             unit.alpha = 1f
 
             ObjectAnimator.ofFloat(unit, "translationX", startX, endX).apply {
-                duration = 8000 
+                duration = 8000
                 startDelay = initialDelay + (index * 1500L)
                 interpolator = LinearInterpolator()
             }
@@ -196,11 +196,14 @@ class HomeFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        super.onDestroyView()
+
         animatorSets.forEach { it.cancel() }
         animatorSets.clear()
         handler.removeCallbacks(animationRunnable)
+
         mediaPlayer?.release()
         mediaPlayer = null
+
+        super.onDestroyView()
     }
 }

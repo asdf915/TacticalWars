@@ -18,19 +18,20 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.functions.FirebaseFunctions
-import com.google.firebase.functions.ktx.functions
-import com.google.firebase.ktx.Firebase
 import java.util.LinkedList
 import java.util.Queue
 
 class GameFragment : Fragment() {
 
 
+
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
-    private val functions: FirebaseFunctions = Firebase.functions("us-central1")
     private var gameId: String = ""
     private var firestoreListener: ListenerRegistration? = null
+
+
+    private var localTeam: Int = 1
+    private var isMultiplayer: Boolean = false
 
 
     private var selectedMapId: Int = 0
@@ -42,6 +43,7 @@ class GameFragment : Fragment() {
     private val cols = 6
     private val boardCells = Array(rows) { arrayOfNulls<FrameLayout>(cols) }
     private val units = mutableListOf<GameUnit>()
+
     private var selectedUnit: GameUnit? = null
     private val reachableTiles = mutableSetOf<Pair<Int, Int>>()
     private val attackableTiles = mutableSetOf<Pair<Int, Int>>()
@@ -54,6 +56,7 @@ class GameFragment : Fragment() {
     private var isBattleInProgress = false
 
 
+
     private lateinit var tvTurnTitle: TextView
     private lateinit var tvHealthInfo: TextView
     private lateinit var tvUnitDetail: TextView
@@ -61,6 +64,7 @@ class GameFragment : Fragment() {
     private lateinit var btnAttack: Button
     private lateinit var btnSecondary: Button
     private lateinit var btnWait: Button
+
 
 
     private var currentFrame = 1
@@ -81,13 +85,18 @@ class GameFragment : Fragment() {
         val moveRange: Int,
         val attackRange: Int,
         val maxHP: Int,
+        val baseAttack: Int,
         val abilityName: String,
         val prefix: String
     ) {
-        INFANTRY("Infantería", 3, 1, 10, "Potenciar",  "infantry"),
-        BAZOOKA ("Bazuca",     3, 2, 12, "Reactivar",  "bazooka"),
-        TANK    ("Tanque",     2, 1, 20, "Empujar",    "tank"),
-        PLANE   ("Avión",      4, 1,  8, "Curar",      "jet")
+
+        INFANTRY("Infantería", 3, 1, 16, 4, "Potenciar", "infantry"),
+
+        BAZOOKA ("Bazuca",     2, 2, 20, 6, "Reactivar", "bazooka"),
+
+        TANK    ("Tanque",     2, 1, 36, 5, "Empujar",   "tank"),
+
+        PLANE   ("Avión",      4, 1, 12, 3, "Curar",     "jet")
     }
 
     data class GameUnit(
@@ -99,117 +108,139 @@ class GameFragment : Fragment() {
         var maxHealth: Int,
         var hasActed: Boolean = false,
         var hasMoved: Boolean = false,
-        var attackPower: Int = 3,
+        var attackPower: Int = type.baseAttack,
         var view: ImageView? = null,
         var state: UnitState = UnitState.STILL
     )
 
 
-    companion object {
-        private const val ARG_MAP_ID    = "map_id"
-        private const val ARG_AI_MODE   = "ai_mode"
-        private const val ARG_DIFFICULTY = "difficulty"
-        private const val ARG_GAME_ID   = "game_id"
 
-        private val MAP1_TILES = listOf(1,1,1,1,1,1, 1,1,1,1,2,1, 1,1,2,1,1,1, 1,2,1,1,2,2, 1,2,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,2,1, 2,1,2,1,1,1)
-        private val MAP2_TILES = listOf(1,1,1,1,4,4, 1,1,2,4,4,4, 4,5,4,4,1,1, 1,1,1,6,1,1, 1,1,1,4,4,2, 1,1,1,1,4,1, 1,1,1,1,6,1, 2,1,2,1,4,1)
-        private val MAP3_TILES = listOf(1,3,1,1,1,2, 1,1,1,1,1,3, 4,4,1,1,1,1, 1,4,4,5,4,4, 1,1,1,1,2,1, 1,2,1,1,1,1, 1,3,1,1,1,1, 1,1,1,1,1,2)
-        private val MAP4_TILES = listOf(1,1,1,1,2,4, 4,5,4,5,4,4, 4,5,4,5,4,4, 2,1,1,1,2,2, 1,1,2,1,1,1, 4,5,4,5,4,4, 4,5,4,5,4,4, 4,1,1,1,1,2)
-        private val MAP5_TILES = listOf(3,1,1,1,2,2, 3,3,4,1,4,1, 1,1,1,1,1,1, 5,4,4,5,5,4, 1,2,6,1,1,2, 3,2,4,1,2,2, 1,1,1,1,1,1, 2,1,2,2,1,1)
+    companion object {
+
+        private const val ARG_MAP_ID      = "map_id"
+        private const val ARG_AI_MODE     = "ai_mode"
+        private const val ARG_DIFFICULTY  = "difficulty"
+        private const val ARG_GAME_ID     = "game_id"
+        private const val ARG_MULTIPLAYER = "multiplayer"
+        private const val ARG_LOCAL_TEAM  = "local_team"
+
+
+        private val MAP_TILES = mapOf(
+            1 to listOf(
+                1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 2, 1,
+                1, 1, 2, 1, 1, 1,
+                1, 2, 1, 1, 2, 2,
+                1, 2, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 2, 1,
+                2, 1, 2, 1, 1, 1
+            ),
+            2 to listOf(
+                1, 1, 1, 1, 4, 4,
+                1, 1, 2, 4, 4, 4,
+                4, 5, 4, 4, 1, 1,
+                1, 1, 1, 6, 1, 1,
+                1, 1, 1, 4, 4, 2,
+                1, 1, 1, 1, 4, 1,
+                1, 1, 1, 1, 6, 1,
+                2, 1, 2, 1, 4, 1
+            ),
+            3 to listOf(
+                1, 3, 1, 1, 1, 2,
+                1, 1, 1, 1, 1, 3,
+                4, 4, 1, 1, 1, 1,
+                1, 4, 4, 5, 4, 4,
+                1, 1, 1, 1, 2, 1,
+                1, 2, 1, 1, 1, 1,
+                1, 3, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 2
+            ),
+            4 to listOf(
+                1, 1, 1, 1, 2, 4,
+                4, 5, 4, 5, 4, 4,
+                4, 5, 4, 5, 4, 4,
+                2, 1, 1, 1, 2, 2,
+                1, 1, 2, 1, 1, 1,
+                4, 5, 4, 5, 4, 4,
+                4, 5, 4, 5, 4, 4,
+                4, 1, 1, 1, 1, 2
+            ),
+            5 to listOf(
+                3, 1, 1, 1, 2, 2,
+                3, 3, 4, 1, 4, 1,
+                1, 1, 1, 1, 1, 1,
+                5, 4, 4, 5, 5, 4,
+                1, 2, 6, 1, 1, 2,
+                3, 2, 4, 1, 2, 2,
+                1, 1, 1, 1, 1, 1,
+                2, 1, 2, 2, 1, 1
+            )
+        )
 
         fun newInstance(
             mapId: Int,
             aiMode: Boolean = false,
             difficulty: String = "Normal",
-            gameId: String = ""
-        ): GameFragment {
-            val fragment = GameFragment()
-            val args = Bundle()
-            args.putInt(ARG_MAP_ID, mapId)
-            args.putBoolean(ARG_AI_MODE, aiMode)
-            args.putString(ARG_DIFFICULTY, difficulty)
-            args.putString(ARG_GAME_ID, gameId)
-            fragment.arguments = args
-            return fragment
+            gameId: String = "",
+            multiplayer: Boolean = false,
+            localTeam: Int = 1
+        ): GameFragment = GameFragment().apply {
+            arguments = Bundle().apply {
+                putInt(ARG_MAP_ID, mapId)
+                putBoolean(ARG_AI_MODE, aiMode)
+                putString(ARG_DIFFICULTY, difficulty)
+                putString(ARG_GAME_ID, gameId)
+                putBoolean(ARG_MULTIPLAYER, multiplayer)
+                putInt(ARG_LOCAL_TEAM, localTeam)
+            }
         }
 
         fun getTileRes(mapId: Int, index: Int): Int = when (getTileNum(mapId, index)) {
-            1 -> R.drawable.tile1
-            2 -> R.drawable.tile2
-            3 -> R.drawable.tile3
-            4 -> R.drawable.tile4
-            5 -> R.drawable.tile5
-            6 -> R.drawable.tile6
+            2    -> R.drawable.tile2
+            3    -> R.drawable.tile3
+            4    -> R.drawable.tile4
+            5    -> R.drawable.tile5
+            6    -> R.drawable.tile6
             else -> R.drawable.tile1
         }
 
         fun getTileNum(mapId: Int, index: Int): Int {
-            val list = when (mapId) {
-                1 -> MAP1_TILES; 2 -> MAP2_TILES; 3 -> MAP3_TILES
-                4 -> MAP4_TILES; 5 -> MAP5_TILES; else -> return 1
-            }
-            return if (index < list.size) list[index] else 1
+            val tiles = MAP_TILES[mapId] ?: return 1
+            return tiles.getOrElse(index) { 1 }
         }
     }
+
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         arguments?.let {
-            selectedMapId = it.getInt(ARG_MAP_ID)
-            isAiMode      = it.getBoolean(ARG_AI_MODE)
+            selectedMapId  = it.getInt(ARG_MAP_ID)
+            isAiMode       = it.getBoolean(ARG_AI_MODE)
             difficulty     = it.getString(ARG_DIFFICULTY, "Normal")
             gameId         = it.getString(ARG_GAME_ID, "")
+            isMultiplayer  = it.getBoolean(ARG_MULTIPLAYER)
+            localTeam      = it.getInt(ARG_LOCAL_TEAM, 1)
         }
     }
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
+        inflater: LayoutInflater,
+        container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? = inflater.inflate(R.layout.fragment_game, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        tvTurnTitle  = view.findViewById(R.id.tvTurnTitle)
-        tvHealthInfo = view.findViewById(R.id.tvHealthInfo)
-        tvUnitDetail = view.findViewById(R.id.tvUnitDetail)
-        llActions    = view.findViewById(R.id.llActions)
-        btnAttack    = view.findViewById(R.id.btnAttack)
-        btnSecondary = view.findViewById(R.id.btnSecondary)
-        btnWait      = view.findViewById(R.id.btnWait)
-
-        val ivBackground = view.findViewById<ImageView>(R.id.ivGameBackground)
-        if (selectedMapId in 1..5) ivBackground.visibility = View.GONE
-        else ivBackground.setImageResource(R.drawable.background4)
-
-        val glBoard = view.findViewById<GridLayout>(R.id.glBoard)
-        setupBoard(glBoard)
+        bindViews(view)
+        setupBackground(view)
+        setupBoard(view.findViewById(R.id.glBoard))
+        setupButtonListeners()
+        setupBattleResultListener()
         updateTurnUI()
-
-        btnWait.setOnClickListener {
-            selectedUnit?.let { unit ->
-                grayOutUnit(unit)
-                finishUnitTurn()
-            }
-        }
-        btnAttack.setOnClickListener    { selectedUnit?.let { showAttackRange(it) } }
-        btnSecondary.setOnClickListener { selectedUnit?.let { showSecondaryRange(it) } }
-
-        parentFragmentManager.setFragmentResultListener("battle_done", viewLifecycleOwner) { _, _ ->
-            isBattleInProgress = false
-            checkUnitDeaths()
-            finishUnitTurn()
-
-            syncGameStateToFirestore()
-            if (isAiMode && currentTeam == 0) {
-                handler.postDelayed({ executeAiTurn() }, 500)
-            }
-        }
-
         initFirestore()
         attachFirestoreListener()
-
         handler.post(animationRunnable)
     }
 
@@ -219,79 +250,152 @@ class GameFragment : Fragment() {
         firestoreListener?.remove()
     }
 
+    private fun bindViews(view: View) {
+        tvTurnTitle  = view.findViewById(R.id.tvTurnTitle)
+        tvHealthInfo = view.findViewById(R.id.tvHealthInfo)
+        tvUnitDetail = view.findViewById(R.id.tvUnitDetail)
+        llActions    = view.findViewById(R.id.llActions)
+        btnAttack    = view.findViewById(R.id.btnAttack)
+        btnSecondary = view.findViewById(R.id.btnSecondary)
+        btnWait      = view.findViewById(R.id.btnWait)
+    }
+
+    private fun setupBackground(view: View) {
+        val ivBackground = view.findViewById<ImageView>(R.id.ivGameBackground)
+        if (selectedMapId in 1..5) {
+            ivBackground.visibility = View.GONE
+        } else {
+            ivBackground.setImageResource(R.drawable.background4)
+        }
+    }
+
+    private fun setupButtonListeners() {
+        btnWait.setOnClickListener {
+            selectedUnit?.let { unit ->
+                grayOutUnit(unit)
+                finishUnitTurn()
+            }
+        }
+        btnAttack.setOnClickListener    { selectedUnit?.let { showAttackRange(it) } }
+        btnSecondary.setOnClickListener { selectedUnit?.let { showSecondaryRange(it) } }
+    }
+
+    private fun setupBattleResultListener() {
+        parentFragmentManager.setFragmentResultListener(
+            "battle_done",
+            viewLifecycleOwner
+        ) { _, _ ->
+
+            isBattleInProgress  = false
+            isInteractionLocked = false
+            battleAttackerIdx   = -1
+            battleTargetIdx     = -1
+            battleDamage        = 0
+
+            checkUnitDeaths()
+
+            if (isMultiplayer && currentTeam != localTeam) {
+                syncGameStateToFirestore()
+                return@setFragmentResultListener
+            }
+
+            finishUnitTurn()
+
+            if (isAiMode && currentTeam == 0) {
+                handler.postDelayed({ executeAiTurn() }, 500)
+            }
+        }
+    }
+
+
 
     private fun initFirestore() {
         if (gameId.isBlank()) {
-
             gameId = db.collection("games").document().id
         }
-
-        val initialData = mapOf(
-            "currentTeam"      to currentTeam,
-            "difficulty"       to difficulty,
-            "isAiMode"         to isAiMode,
-            "selectedMapId"    to selectedMapId,
-            "isBattleInProgress" to isBattleInProgress
-        )
-
         db.collection("games").document(gameId)
-            .set(initialData)
+            .set(buildGameState())
             .addOnFailureListener { e ->
-                Toast.makeText(requireContext(),
-                    "Error al inicializar partida: ${e.message}",
-                    Toast.LENGTH_SHORT).show()
+                showToast("Error al inicializar partida: ${e.message}")
             }
     }
 
 
     private fun syncGameStateToFirestore() {
         if (gameId.isBlank()) return
-
-        val update = mapOf(
-            "currentTeam"        to currentTeam,
-            "difficulty"         to difficulty,
-            "isAiMode"           to isAiMode,
-            "selectedMapId"      to selectedMapId,
-            "isBattleInProgress" to isBattleInProgress
-        )
-
         db.collection("games").document(gameId)
-            .update(update)
+            .update(buildGameState())
             .addOnFailureListener { e ->
-                Toast.makeText(requireContext(),
-                    "Error al sincronizar: ${e.message}",
-                    Toast.LENGTH_SHORT).show()
+                showToast("Error al sincronizar: ${e.message}")
             }
     }
 
 
     private fun attachFirestoreListener() {
         if (gameId.isBlank()) return
-
         firestoreListener = db.collection("games").document(gameId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null || !snapshot.exists()) return@addSnapshotListener
 
+                if (!isMultiplayer && snapshot.metadata.hasPendingWrites()) return@addSnapshotListener
 
-                val remoteDifficulty = snapshot.getString("difficulty")
-                if (remoteDifficulty != null && remoteDifficulty != difficulty) {
-                    difficulty = remoteDifficulty
-                    Toast.makeText(requireContext(),
-                        "Dificultad actualizada: $difficulty",
-                        Toast.LENGTH_SHORT).show()
-                }
+                if (isMultiplayer && snapshot.metadata.hasPendingWrites()) return@addSnapshotListener
 
-
+                val remoteTeam   = (snapshot.getLong("currentTeam") ?: currentTeam.toLong()).toInt()
                 val remoteBattle = snapshot.getBoolean("isBattleInProgress") ?: false
-                if (remoteBattle != isBattleInProgress && !isBattleInProgress) {
-                    isBattleInProgress = remoteBattle
+
+
+                if (!isMultiplayer) {
+                    snapshot.getString("difficulty")
+                        ?.takeIf { it != difficulty }
+                        ?.let { difficulty = it }
                 }
 
 
-                val remoteTeam = (snapshot.getLong("currentTeam") ?: currentTeam.toLong()).toInt()
+                if (isMultiplayer) {
+                    @Suppress("UNCHECKED_CAST")
+                    val remoteUnits = snapshot.get("units") as? List<Map<String, Any>>
+
+
+                    if (remoteUnits != null && !isBattleInProgress) {
+                        applyRemoteUnits(remoteUnits)
+                    }
+
+
+                    if (remoteBattle && !isBattleInProgress) {
+                        isBattleInProgress = true
+                        val atkIdx = (snapshot.getLong("battleAttackerIdx") ?: -1L).toInt()
+                        val tgtIdx = (snapshot.getLong("battleTargetIdx")   ?: -1L).toInt()
+                        val dmg    = (snapshot.getLong("battleDamage")      ?: 0L).toInt()
+
+
+                        if (remoteUnits != null) applyRemoteUnits(remoteUnits)
+
+                        val attacker = units.getOrNull(atkIdx)
+                        val target   = units.getOrNull(tgtIdx)
+                        if (attacker != null && target != null && dmg > 0) {
+                            showRemoteBattle(attacker, target, dmg)
+                        }
+                        return@addSnapshotListener
+                    }
+                }
+
                 if (remoteTeam != currentTeam && !isBattleInProgress) {
                     currentTeam = remoteTeam
+
+
+                    units.filter { it.team == currentTeam }.forEach {
+                        if (!isMultiplayer) {
+
+                            it.hasActed = false
+                            it.hasMoved = false
+                            resetUnitAppearance(it)
+                        }
+                    }
+
+                    clearSelection()
                     updateTurnUI()
+
                     if (isAiMode && currentTeam == 0) {
                         handler.postDelayed({ executeAiTurn() }, 1000)
                     }
@@ -299,7 +403,141 @@ class GameFragment : Fragment() {
             }
     }
 
+    private fun showRemoteBattle(attacker: GameUnit, target: GameUnit, damage: Int) {
+        parentFragmentManager.beginTransaction()
+            .replace(
+                R.id.fragment_container,
+                BattleFragment.newInstance(
+                    attacker.type.prefix, attacker.team, attacker.type.maxHP, attacker.health,
+                    target.type.prefix,   target.team,   target.type.maxHP,   target.health,
+                    damage,
+                    isRemote = true
+                )
+            )
+            .addToBackStack(null)
+            .commit()
+    }
 
+
+    @Suppress("UNCHECKED_CAST")
+    private fun applyRemoteUnits(remoteList: List<Map<String, Any>>) {
+
+        if (remoteList.size != units.size) {
+            rebuildUnitsFromRemote(remoteList)
+            checkVictory()
+            return
+        }
+
+        for (remote in remoteList) {
+            val rTeam = (remote["team"] as? Long)?.toInt() ?: continue
+            val rType = remote["type"] as? String ?: continue
+            val unit  = units.find { it.team == rTeam && it.type.name == rType } ?: continue
+
+            val newR = (remote["r"] as? Long)?.toInt() ?: unit.r
+            val newC = (remote["c"] as? Long)?.toInt() ?: unit.c
+
+
+            if (newR != unit.r || newC != unit.c) {
+
+                unit.state = when {
+                    newR < unit.r -> UnitState.UP
+                    newR > unit.r -> UnitState.DOWN
+                    newC < unit.c -> UnitState.LEFT
+                    else          -> UnitState.RIGHT
+                }
+                updateUnitsAnimations()
+
+
+                moveUnitDirectly(unit, newR, newC)
+                handler.postDelayed({
+                    unit.state = UnitState.STILL
+                    updateUnitsAnimations()
+                }, 450)
+            }
+
+            unit.health      = (remote["health"]      as? Long)?.toInt() ?: unit.health
+            unit.maxHealth   = (remote["maxHealth"]   as? Long)?.toInt() ?: unit.maxHealth
+            unit.hasActed    = remote["hasActed"]    as? Boolean ?: unit.hasActed
+            unit.hasMoved    = remote["hasMoved"]    as? Boolean ?: unit.hasMoved
+            unit.attackPower = (remote["attackPower"] as? Long)?.toInt() ?: unit.attackPower
+
+            if (unit.hasActed) grayOutUnit(unit) else resetUnitAppearance(unit)
+        }
+        updateTurnUI()
+    }
+
+
+    @Suppress("UNCHECKED_CAST")
+    private fun rebuildUnitsFromRemote(remoteList: List<Map<String, Any>>) {
+
+        for (unit in units) {
+            (unit.view?.parent as? ViewGroup)?.removeView(unit.view)
+        }
+        units.clear()
+
+        for (remote in remoteList) {
+            val typeName = remote["type"] as? String ?: continue
+            val type     = UnitType.values().find { it.name == typeName } ?: continue
+            val team     = (remote["team"]        as? Long)?.toInt() ?: continue
+            val r        = (remote["r"]           as? Long)?.toInt() ?: continue
+            val c        = (remote["c"]           as? Long)?.toInt() ?: continue
+            val hp       = (remote["health"]      as? Long)?.toInt() ?: type.maxHP
+            val maxHp    = (remote["maxHealth"]   as? Long)?.toInt() ?: type.maxHP
+            val acted    = remote["hasActed"]    as? Boolean ?: false
+            val moved    = remote["hasMoved"]    as? Boolean ?: false
+            val atk      = (remote["attackPower"] as? Long)?.toInt() ?: type.baseAttack
+
+            val unit = GameUnit(
+                type        = type,
+                team        = team,
+                r           = r,
+                c           = c,
+                health      = hp,
+                maxHealth   = maxHp,
+                hasActed    = acted,
+                hasMoved    = moved,
+                attackPower = atk
+            )
+            val frame = boardCells[r][c] ?: continue
+            unit.view = buildUnitView(frame, team, type)
+            if (acted) grayOutUnit(unit)
+            units.add(unit)
+        }
+        updateTurnUI()
+    }
+
+
+    private var battleAttackerIdx: Int = -1
+    private var battleTargetIdx: Int   = -1
+    private var battleDamage: Int      = 0
+
+    private fun buildGameState() = mapOf(
+        "currentTeam"        to currentTeam,
+        "difficulty"         to difficulty,
+        "isAiMode"           to isAiMode,
+        "isMultiplayer"      to isMultiplayer,
+        "selectedMapId"      to selectedMapId,
+        "isBattleInProgress" to isBattleInProgress,
+        "battleAttackerIdx"  to battleAttackerIdx,
+        "battleTargetIdx"    to battleTargetIdx,
+        "battleDamage"       to battleDamage,
+        "units"              to serializeUnits()
+    )
+
+
+    private fun serializeUnits(): List<Map<String, Any>> = units.map { u ->
+        mapOf(
+            "type"        to u.type.name,
+            "team"        to u.team,
+            "r"           to u.r,
+            "c"           to u.c,
+            "health"      to u.health,
+            "maxHealth"   to u.maxHealth,
+            "hasActed"    to u.hasActed,
+            "hasMoved"    to u.hasMoved,
+            "attackPower" to u.attackPower
+        )
+    }
 
 
 
@@ -313,79 +551,13 @@ class GameFragment : Fragment() {
             return
         }
 
-        val unit      = aiUnits.first()
-        val unitIndex = units.indexOf(unit)
-
-
-        val unitsPayload = units.map { u ->
-            mapOf(
-                "type"        to u.type.name,
-                "team"        to u.team,
-                "r"           to u.r,
-                "c"           to u.c,
-                "health"      to u.health,
-                "maxHealth"   to u.maxHealth,
-                "hasActed"    to u.hasActed,
-                "hasMoved"    to u.hasMoved,
-                "attackPower" to u.attackPower
-            )
-        }
-
-        val payload = hashMapOf(
-            "gameId"      to gameId,
-            "units"       to unitsPayload,
-            "aiUnitIndex" to unitIndex
-        )
-
-        functions
-            .getHttpsCallable("calculateAiMove")
-            .call(payload)
-            .addOnSuccessListener { result ->
-                @Suppress("UNCHECKED_CAST")
-                val data = result.data as? Map<String, Any> ?: return@addOnSuccessListener
-                handleAiMoveResult(unit, data)
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(
-                    requireContext(),
-                    "Error calculando movimiento IA: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
-                unit.hasActed = true
-                grayOutUnit(unit)
-                handler.postDelayed({ executeAiTurn() }, 800)
-            }
-    }
-
-
-    @Suppress("UNCHECKED_CAST")
-    private fun handleAiMoveResult(unit: GameUnit, data: Map<String, Any>) {
-        // Parse path returned by the Cloud Function
-        val rawPath = data["path"] as? List<Map<String, Any>> ?: emptyList()
-        val path = rawPath.map { step ->
-            Pair(
-                (step["r"] as? Long)?.toInt() ?: unit.r,
-                (step["c"] as? Long)?.toInt() ?: unit.c
-            )
-        }
-
-
-        val rawAttack  = data["attackTarget"] as? Map<String, Any>
-        val attackPos  = rawAttack?.let {
-            Pair(
-                (it["r"] as? Long)?.toInt() ?: -1,
-                (it["c"] as? Long)?.toInt() ?: -1
-            )
-        }
-        val damage = (data["damage"] as? Long)?.toInt() ?: 0
-
+        val unit    = aiUnits.first()
+        val enemies = units.filter { it.team == 1 }
+        val movePos = chooseMovePosition(unit, enemies)
+        val path    = findPath(unit, Pair(unit.r, unit.c), movePos)
 
         animatePath(unit, path, 1) {
-            if (attackPos != null && damage > 0) {
-                val target = units.find { it.team == 1 && it.r == attackPos.first && it.c == attackPos.second }
-                target?.let { startBattle(unit, it, damage) }
-            }
-
+            resolveAiAttack(unit, enemies)
             if (!isBattleInProgress) {
                 unit.hasActed = true
                 grayOutUnit(unit)
@@ -395,102 +567,120 @@ class GameFragment : Fragment() {
         }
     }
 
-
-
-    private fun updateUnitsAnimations() {
-        for (unit in units) {
-            val teamStr = if (unit.team == 0) "red" else "blue"
-            val statePrefix = when {
-                unit.hasActed          -> "unavailable"
-                unit.state == UnitState.UP    -> "up"
-                unit.state == UnitState.DOWN  -> "down"
-                unit.state == UnitState.LEFT || unit.state == UnitState.RIGHT -> "move"
-                else -> "still"
+    private fun chooseMovePosition(unit: GameUnit, enemies: List<GameUnit>): Pair<Int, Int> {
+        val reachable = collectReachablePositions(unit)
+        return when (difficulty) {
+            "Fácil"   -> reachable.randomOrNull() ?: Pair(unit.r, unit.c)
+            "Difícil" -> {
+                val weakest = enemies.minByOrNull { it.health.toFloat() / it.maxHealth }
+                    ?: return reachable.randomOrNull() ?: Pair(unit.r, unit.c)
+                reachable.minByOrNull { pos ->
+                    manhattan(pos.first, pos.second, weakest.r, weakest.c)
+                } ?: Pair(unit.r, unit.c)
             }
-            val resName = "${unit.type.prefix}$statePrefix$teamStr$currentFrame"
-            val resId = resources.getIdentifier(resName, "drawable", requireContext().packageName)
-            if (resId != 0) unit.view?.setImageResource(resId)
-
-            val scale = if (statePrefix in listOf("up","down","move")) 1.4f else 1.0f
-            unit.view?.scaleY = scale
-            if (unit.state == UnitState.RIGHT) {
-                unit.view?.scaleX = -scale
-            } else if (unit.state == UnitState.LEFT) {
-                unit.view?.scaleX = scale
-            } else {
-                val cx = unit.view?.scaleX ?: 1f
-                unit.view?.scaleX = if (cx < 0) -scale else scale
+            else -> { // Normal
+                if (enemies.isEmpty()) return reachable.randomOrNull() ?: Pair(unit.r, unit.c)
+                reachable.minByOrNull { pos ->
+                    enemies.minOf { e -> manhattan(pos.first, pos.second, e.r, e.c) }
+                } ?: Pair(unit.r, unit.c)
             }
         }
     }
 
-    private fun getTileTypeAt(r: Int, c: Int) =
-        getTileNum(selectedMapId, r * cols + c)
+    private fun resolveAiAttack(unit: GameUnit, enemies: List<GameUnit>) {
+        val inRange = enemies.filter { e ->
+            manhattan(unit.r, unit.c, e.r, e.c) <= unit.type.attackRange
+        }
+        if (inRange.isEmpty()) return
+        if (difficulty == "Fácil" && Math.random() < 0.5) return
 
-    private fun updateTurnUI() {
-        val teamName  = if (currentTeam == 0) (if (isAiMode) "ROJO (IA)" else "ROJO") else "AZUL"
-        val teamColor = if (currentTeam == 0) Color.RED else Color.CYAN
-        tvTurnTitle.text = "TURNO JUGADOR $teamName"
-        tvTurnTitle.setTextColor(teamColor)
-        val healthText = units.filter { it.team == currentTeam }
-            .joinToString(" | ") { "${it.type.displayName}: ${it.health}" }
-        tvHealthInfo.text = healthText
+        val target = if (difficulty == "Difícil") inRange.minByOrNull { it.health }!! else inRange.first()
+        val bonus  = if (difficulty == "Difícil") 1 else 0
+        var damage = unit.attackPower + bonus
+        if (getTileTypeAt(target.r, target.c) == 2) damage = (damage * 0.5).toInt().coerceAtLeast(1)
+        startBattle(unit, target, damage)
     }
+
+
+    private fun collectReachablePositions(unit: GameUnit): List<Pair<Int, Int>> {
+        val result  = mutableListOf(Pair(unit.r, unit.c))
+        val queue: Queue<Triple<Int, Int, Int>> = LinkedList()
+        val visited = mutableMapOf(Pair(unit.r, unit.c) to 0)
+        queue.add(Triple(unit.r, unit.c, 0))
+
+        while (queue.isNotEmpty()) {
+            val (r, c, dist) = queue.poll()!!
+            if (dist > 0) result.add(Pair(r, c))
+            if (dist >= unit.type.moveRange) continue
+            for ((nr, nc) in neighbors(r, c)) {
+                val key = Pair(nr, nc)
+                if (key !in visited && canTraverse(nr, nc, unit.type) &&
+                    units.none { it.r == nr && it.c == nc }) {
+                    visited[key] = dist + 1
+                    queue.add(Triple(nr, nc, dist + 1))
+                }
+            }
+        }
+        return result
+    }
+
 
     private fun setupBoard(gridLayout: GridLayout) {
         gridLayout.removeAllViews()
-        gridLayout.rowCount  = rows
+        gridLayout.rowCount    = rows
         gridLayout.columnCount = cols
-        gridLayout.clipChildren   = false
-        gridLayout.clipToPadding  = false
+        gridLayout.clipChildren  = false
+        gridLayout.clipToPadding = false
 
         gridLayout.post {
-            val cellSize = Math.min(gridLayout.width / cols, gridLayout.height / rows)
+            val cellSize = minOf(gridLayout.width / cols, gridLayout.height / rows)
             if (cellSize <= 0) return@post
+            buildCells(gridLayout, cellSize)
+            placeUnits(cellSize)
+        }
+    }
 
-            for (r in 0 until rows) {
-                for (c in 0 until cols) {
-                    val frame = FrameLayout(requireContext())
-                    frame.clipChildren = false
-                    val params = GridLayout.LayoutParams().apply {
+    private fun buildCells(gridLayout: GridLayout, cellSize: Int) {
+        for (r in 0 until rows) {
+            for (c in 0 until cols) {
+                val frame = FrameLayout(requireContext()).apply {
+                    clipChildren = false
+                    layoutParams = GridLayout.LayoutParams().apply {
                         rowSpec    = GridLayout.spec(r)
                         columnSpec = GridLayout.spec(c)
-                        width  = cellSize; height = cellSize
+                        width  = cellSize
+                        height = cellSize
                     }
-                    frame.layoutParams = params
-
-                    if (selectedMapId in 1..5) {
-                        val tileView = ImageView(requireContext()).apply {
-                            tag = "tile"
-                            layoutParams = FrameLayout.LayoutParams(cellSize, cellSize)
-                            setImageResource(getTileRes(selectedMapId, r * cols + c))
-                            scaleType = ImageView.ScaleType.CENTER_CROP
-                        }
-                        frame.addView(tileView)
-                    }
-
-                    frame.setBackgroundResource(R.drawable.cell_border)
-                    boardCells[r][c] = frame
-                    gridLayout.addView(frame)
-
-                    frame.setOnClickListener {
-                        if (!(isAiMode && currentTeam == 0)) onCellClicked(r, c)
-                    }
+                    setBackgroundResource(R.drawable.cell_border)
+                }
+                if (selectedMapId in 1..5) {
+                    frame.addView(ImageView(requireContext()).apply {
+                        tag       = "tile"
+                        layoutParams = FrameLayout.LayoutParams(cellSize, cellSize)
+                        setImageResource(getTileRes(selectedMapId, r * cols + c))
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                    })
+                }
+                boardCells[r][c] = frame
+                gridLayout.addView(frame)
+                frame.setOnClickListener {
+                    if (!(isAiMode && currentTeam == 0)) onCellClicked(r, c)
                 }
             }
+        }
+    }
 
-            if (units.isEmpty()) {
-                for (c in 1..4) {
-                    createUnit(0, c, 0, c - 1)
-                    createUnit(7, c, 1, c - 1)
-                }
-            } else {
-                for (unit in units) {
-                    val frame = boardCells[unit.r][unit.c]
-                    unit.view?.let {
-                        (it.parent as? ViewGroup)?.removeView(it)
-                        frame?.addView(it)
-                    }
+    private fun placeUnits(cellSize: Int) {
+        if (units.isEmpty()) {
+            for (col in 1..4) {
+                createUnit(r = 0, c = col, team = 0, typeIndex = col - 1)
+                createUnit(r = 7, c = col, team = 1, typeIndex = col - 1)
+            }
+        } else {
+            for (unit in units) {
+                unit.view?.let {
+                    (it.parent as? ViewGroup)?.removeView(it)
+                    boardCells[unit.r][unit.c]?.addView(it)
                 }
             }
         }
@@ -498,18 +688,20 @@ class GameFragment : Fragment() {
 
     private fun createUnit(r: Int, c: Int, team: Int, typeIndex: Int) {
         val type = UnitType.values()[typeIndex % 4]
-        val unit = GameUnit(type, team, r, c, type.maxHP, type.maxHP)
-        unit.view = addUnitToUI(boardCells[r][c]!!, team, type)
-        units.add(unit)
+        GameUnit(type, team, r, c, type.maxHP, type.maxHP).also { unit ->
+            unit.view = buildUnitView(boardCells[r][c]!!, team, type)
+            units.add(unit)
+        }
     }
 
-    private fun addUnitToUI(container: FrameLayout, team: Int, type: UnitType): ImageView {
-        val size   = (resources.displayMetrics.density * 56).toInt()
-        val params = FrameLayout.LayoutParams(size, size).apply { gravity = Gravity.CENTER }
+    private fun buildUnitView(container: FrameLayout, team: Int, type: UnitType): ImageView {
+        val size    = (resources.displayMetrics.density * 56).toInt()
         val teamStr = if (team == 0) "red" else "blue"
-        val resId  = resources.getIdentifier("${type.prefix}still${teamStr}1", "drawable", requireContext().packageName)
+        val resId   = resources.getIdentifier(
+            "${type.prefix}still${teamStr}1", "drawable", requireContext().packageName
+        )
         return ImageView(requireContext()).apply {
-            layoutParams = params
+            layoutParams = FrameLayout.LayoutParams(size, size).apply { gravity = Gravity.CENTER }
             if (resId != 0) setImageResource(resId)
             setPadding(4, 4, 4, 4)
             isClickable = false
@@ -517,71 +709,103 @@ class GameFragment : Fragment() {
         }
     }
 
+
     private fun onCellClicked(r: Int, c: Int) {
         if (isInteractionLocked || isBattleInProgress) return
 
-        if (isWaitingForSecondary) {
-            if (Pair(r, c) in abilityTiles) {
-                val target = units.find { it.r == r && it.c == c }
-                if (target != null) {
-                    executeSecondaryAbility(selectedUnit!!, target)
-                    selectedUnit?.let { u -> u.hasActed = true; grayOutUnit(u) }
-                    finishUnitTurn()
-                    return
-                }
-            }
-            clearSecondaryMode(); return
-        }
+        if (isMultiplayer && currentTeam != localTeam) return
 
-        if (isWaitingForAction) {
-            if (Pair(r, c) in attackableTiles) {
-                val target = units.find { it.r == r && it.c == c && it.team != currentTeam }
-                target?.let {
-                    var damage = selectedUnit?.attackPower ?: 3
-                    if (getTileTypeAt(it.r, it.c) == 2) damage = (damage * 0.5).toInt().coerceAtLeast(1)
-                    startBattle(selectedUnit!!, it, damage); return
-                }
-            } else {
-                if (selectedUnit?.hasMoved == true) {
-                    clearHighlights(); attackableTiles.clear()
-                    isWaitingForAction = true; llActions.visibility = View.VISIBLE; return
-                }
-                clearSelection()
-            }
-            return
-        }
-
-        val unitAtCell = units.find { it.r == r && it.c == c }
-        if (selectedUnit != null) {
-            when {
-                Pair(r, c) in reachableTiles && !selectedUnit!!.hasMoved -> moveUnit(selectedUnit!!, r, c)
-                r == selectedUnit!!.r && c == selectedUnit!!.c           -> showActionUI()
-                else -> {
-                    clearSelection()
-                    if (unitAtCell != null && unitAtCell.team == currentTeam && !unitAtCell.hasActed)
-                        selectUnit(unitAtCell)
-                }
-            }
-        } else if (unitAtCell != null && unitAtCell.team == currentTeam && !unitAtCell.hasActed) {
-            selectUnit(unitAtCell)
+        when {
+            isWaitingForSecondary -> handleSecondaryClick(r, c)
+            isWaitingForAction    -> handleActionClick(r, c)
+            else                  -> handleSelectionClick(r, c)
         }
     }
 
-    private fun startBattle(attacker: GameUnit, target: GameUnit, damage: Int) {
-        isBattleInProgress = true
-        syncGameStateToFirestore()          // ← persist battle start
+    private fun handleSecondaryClick(r: Int, c: Int) {
+        val pos = Pair(r, c)
+        if (pos in abilityTiles) {
+            units.find { it.r == r && it.c == c }?.let { target ->
+                executeSecondaryAbility(selectedUnit!!, target)
+                selectedUnit?.let { u ->
+                    u.hasActed = true
+                    grayOutUnit(u)
+                }
+                finishUnitTurn()
+                return
+            }
+        }
+        clearSecondaryMode()
+    }
 
-        val battleFragment = BattleFragment.newInstance(
-            attacker.type.prefix, attacker.team, attacker.type.maxHP, attacker.health,
-            target.type.prefix,   target.team,   target.type.maxHP,   target.health,
-            damage
-        )
-        target.health -= damage
+    private fun handleActionClick(r: Int, c: Int) {
+        val pos = Pair(r, c)
+        if (pos in attackableTiles) {
+            val target = units.find { it.r == r && it.c == c && it.team != currentTeam }
+            target?.let {
+                var damage = selectedUnit?.attackPower ?: 3
+                if (getTileTypeAt(it.r, it.c) == 2) damage = (damage * 0.5).toInt().coerceAtLeast(1)
+                startBattle(selectedUnit!!, it, damage)
+                return
+            }
+        }
+        // Clicked outside attack range
+        if (selectedUnit?.hasMoved == true) {
+            clearHighlights()
+            attackableTiles.clear()
+            isWaitingForAction = true
+            llActions.visibility = View.VISIBLE
+        } else {
+            clearSelection()
+        }
+    }
+
+    private fun handleSelectionClick(r: Int, c: Int) {
+        val pos        = Pair(r, c)
+        val unitAtCell = units.find { it.r == r && it.c == c }
+        val sel        = selectedUnit
+
+        if (sel != null) {
+            when {
+                pos in reachableTiles && !sel.hasMoved -> moveUnit(sel, r, c)
+                r == sel.r && c == sel.c               -> showActionUI()
+                else -> {
+                    clearSelection()
+                    unitAtCell
+                        ?.takeIf { it.team == currentTeam && !it.hasActed }
+                        ?.let { selectUnit(it) }
+                }
+            }
+        } else {
+            unitAtCell
+                ?.takeIf { it.team == currentTeam && !it.hasActed }
+                ?.let { selectUnit(it) }
+        }
+    }
+
+
+    private fun startBattle(attacker: GameUnit, target: GameUnit, damage: Int) {
+        isBattleInProgress  = true
+        battleAttackerIdx   = units.indexOf(attacker)
+        battleTargetIdx     = units.indexOf(target)
+        battleDamage        = damage
+
+        target.health    -= damage
         attacker.hasActed = true
         grayOutUnit(attacker)
 
+
+        syncGameStateToFirestore()
+
         parentFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, battleFragment)
+            .replace(
+                R.id.fragment_container,
+                BattleFragment.newInstance(
+                    attacker.type.prefix, attacker.team, attacker.type.maxHP, attacker.health,
+                    target.type.prefix,   target.team,   target.type.maxHP,   target.health,
+                    damage
+                )
+            )
             .addToBackStack(null)
             .commit()
     }
@@ -602,210 +826,326 @@ class GameFragment : Fragment() {
         when (user.type) {
             UnitType.INFANTRY -> {
                 target.attackPower += 2
-                Toast.makeText(requireContext(), "${target.type.displayName} potenciado!", Toast.LENGTH_SHORT).show()
+                showToast("${target.type.displayName} potenciado!")
             }
             UnitType.BAZOOKA -> {
-                target.hasActed = false; target.hasMoved = false
+                target.hasActed = false
+                target.hasMoved = false
                 resetUnitAppearance(target)
-                Toast.makeText(requireContext(), "${target.type.displayName} reactivado!", Toast.LENGTH_SHORT).show()
+                showToast("${target.type.displayName} reactivado!")
             }
             UnitType.TANK -> {
-                val dr = target.r - user.r; val dc = target.c - user.c
-                val nr = target.r + dr;     val nc = target.c + dc
-                if (nr in 0 until rows && nc in 0 until cols && units.none { it.r == nr && it.c == nc }) {
+                val nr = target.r + (target.r - user.r)
+                val nc = target.c + (target.c - user.c)
+                if (nr in 0 until rows && nc in 0 until cols &&
+                    units.none { it.r == nr && it.c == nc }) {
                     moveUnitDirectly(target, nr, nc)
-                    Toast.makeText(requireContext(), "${target.type.displayName} empujado!", Toast.LENGTH_SHORT).show()
+                    showToast("${target.type.displayName} empujado!")
                 } else {
-                    Toast.makeText(requireContext(), "No se puede empujar ahí", Toast.LENGTH_SHORT).show()
+                    showToast("No se puede empujar ahí")
                 }
             }
             UnitType.PLANE -> {
-                target.health = Math.min(target.maxHealth, target.health + 5)
-                Toast.makeText(requireContext(), "${target.type.displayName} curado!", Toast.LENGTH_SHORT).show()
+                target.health = minOf(target.maxHealth, target.health + 5)
+                showToast("${target.type.displayName} curado!")
             }
         }
     }
 
-    private fun moveUnitDirectly(unit: GameUnit, newR: Int, newC: Int) {
-        val oldFrame = boardCells[unit.r][unit.c]
-        val newFrame = boardCells[newR][newC]
-        val unitView = unit.view ?: return
-        val cellSize = oldFrame?.width?.toFloat() ?: 0f
-
-        oldFrame?.removeView(unitView)
-        newFrame?.addView(unitView)
-        newFrame?.elevation = 100f
-
-        unitView.translationX = (unit.c - newC) * cellSize
-        unitView.translationY = (unit.r - newR) * cellSize
-        unitView.animate().translationX(0f).translationY(0f).setDuration(400)
-            .withEndAction { newFrame?.elevation = 0f }.start()
-
-        unit.r = newR; unit.c = newC
-    }
 
     private fun selectUnit(unit: GameUnit) {
-        selectedUnit = unit
+        selectedUnit     = unit
         tvUnitDetail.text = "UNIDAD: ${unit.type.displayName} | SALUD: ${unit.health}/${unit.maxHealth}"
         btnSecondary.text = unit.type.abilityName
         if (unit.hasMoved) showActionUI() else showMovementRange(unit)
     }
 
     private fun clearSelection() {
-        selectedUnit = null
-        reachableTiles.clear(); attackableTiles.clear(); abilityTiles.clear()
-        isWaitingForAction = false; isWaitingForSecondary = false
-        llActions.visibility = View.INVISIBLE
-        tvUnitDetail.text = "SELECCIONA UNA UNIDAD"
+        selectedUnit        = null
+        isWaitingForAction  = false
+        isWaitingForSecondary = false
+        reachableTiles.clear()
+        attackableTiles.clear()
+        abilityTiles.clear()
+        llActions.visibility  = View.INVISIBLE
+        tvUnitDetail.text     = "SELECCIONA UNA UNIDAD"
         clearHighlights()
     }
 
     private fun clearSecondaryMode() {
-        isWaitingForSecondary = false; abilityTiles.clear()
-        clearHighlights(); llActions.visibility = View.VISIBLE
+        isWaitingForSecondary = false
+        abilityTiles.clear()
+        clearHighlights()
+        llActions.visibility = View.VISIBLE
+    }
+
+    private fun showActionUI() {
+        isWaitingForAction    = false
+        isWaitingForSecondary = false
+        llActions.visibility  = View.VISIBLE
     }
 
     private fun showMovementRange(unit: GameUnit) {
-        clearHighlights(); reachableTiles.clear()
+        clearHighlights()
+        reachableTiles.clear()
         val queue: Queue<Triple<Int, Int, Int>> = LinkedList()
-        queue.add(Triple(unit.r, unit.c, 0))
         val visited = mutableMapOf(Pair(unit.r, unit.c) to 0)
+        queue.add(Triple(unit.r, unit.c, 0))
 
         while (queue.isNotEmpty()) {
-            val (currR, currC, dist) = queue.poll()!!
-            if (dist > 0) { reachableTiles.add(Pair(currR, currC)); highlightCell(currR, currC, Color.argb(128, 0, 100, 255)) }
-            if (dist < unit.type.moveRange) {
-                for (n in arrayOf(Pair(currR-1,currC),Pair(currR+1,currC),Pair(currR,currC-1),Pair(currR,currC+1))) {
-                    if (n.first in 0 until rows && n.second in 0 until cols) {
-                        val tt = getTileTypeAt(n.first, n.second)
-                        val ok = when (tt) { 3->false; 4->unit.type==UnitType.PLANE; else->true }
-                        if (ok && units.none { it.r==n.first && it.c==n.second } && visited[n]==null) {
-                            visited[n] = dist+1; queue.add(Triple(n.first,n.second,dist+1))
-                        }
-                    }
+            val (r, c, dist) = queue.poll()!!
+            if (dist > 0) {
+                reachableTiles.add(Pair(r, c))
+                highlightCell(r, c, Color.argb(128, 0, 100, 255))
+            }
+            if (dist >= unit.type.moveRange) continue
+            for ((nr, nc) in neighbors(r, c)) {
+                val key = Pair(nr, nc)
+                if (key !in visited && canTraverse(nr, nc, unit.type) &&
+                    units.none { it.r == nr && it.c == nc }) {
+                    visited[key] = dist + 1
+                    queue.add(Triple(nr, nc, dist + 1))
                 }
             }
         }
     }
 
     private fun showAttackRange(unit: GameUnit) {
-        clearHighlights(); attackableTiles.clear()
-        isWaitingForAction = true; llActions.visibility = View.INVISIBLE
+        clearHighlights()
+        attackableTiles.clear()
+        isWaitingForAction   = true
+        llActions.visibility = View.INVISIBLE
         val range = unit.type.attackRange
-        for (dr in -range..range) for (dc in -range..range) {
-            val dist = Math.abs(dr) + Math.abs(dc)
-            if (dist in 1..range) {
-                val nr = unit.r + dr; val nc = unit.c + dc
+        for (dr in -range..range) {
+            for (dc in -range..range) {
+                val dist = Math.abs(dr) + Math.abs(dc)
+                if (dist !in 1..range) continue
+                val nr = unit.r + dr
+                val nc = unit.c + dc
                 if (nr in 0 until rows && nc in 0 until cols) {
-                    attackableTiles.add(Pair(nr, nc)); highlightCell(nr, nc, Color.argb(128, 255, 0, 0))
+                    attackableTiles.add(Pair(nr, nc))
+                    highlightCell(nr, nc, Color.argb(128, 255, 0, 0))
                 }
             }
         }
     }
 
     private fun showSecondaryRange(unit: GameUnit) {
-        clearHighlights(); abilityTiles.clear()
-        isWaitingForSecondary = true; llActions.visibility = View.INVISIBLE
-        for (n in arrayOf(Pair(unit.r-1,unit.c),Pair(unit.r+1,unit.c),Pair(unit.r,unit.c-1),Pair(unit.r,unit.c+1))) {
-            if (n.first in 0 until rows && n.second in 0 until cols) {
-                abilityTiles.add(n); highlightCell(n.first, n.second, Color.argb(128, 0, 255, 0))
-            }
+        clearHighlights()
+        abilityTiles.clear()
+        isWaitingForSecondary = true
+        llActions.visibility  = View.INVISIBLE
+        for ((nr, nc) in neighbors(unit.r, unit.c)) {
+            abilityTiles.add(Pair(nr, nc))
+            highlightCell(nr, nc, Color.argb(128, 0, 255, 0))
         }
     }
 
     private fun highlightCell(r: Int, c: Int, color: Int) {
         val frame = boardCells[r][c] ?: return
-        val highlight = View(requireContext()).apply { tag = "highlight"; setBackgroundColor(color) }
-        val insertIndex = if (frame.childCount > 0 && frame.getChildAt(0).tag == "tile") 1 else 0
-        frame.addView(highlight, insertIndex)
+        val overlay = View(requireContext()).apply {
+            tag = "highlight"
+            setBackgroundColor(color)
+        }
+        val insertAt = if (frame.childCount > 0 && frame.getChildAt(0).tag == "tile") 1 else 0
+        frame.addView(overlay, insertAt)
     }
 
     private fun clearHighlights() {
-        for (r in 0 until rows) for (c in 0 until cols) {
-            val frame = boardCells[r][c] ?: continue
-            frame.findViewWithTag<View>("highlight")?.let { frame.removeView(it) }
+        for (r in 0 until rows) {
+            for (c in 0 until cols) {
+                val frame = boardCells[r][c] ?: continue
+                frame.findViewWithTag<View>("highlight")?.let { frame.removeView(it) }
+            }
         }
     }
 
+
     private fun moveUnit(unit: GameUnit, newR: Int, newC: Int) {
         val path = findPath(unit, Pair(unit.r, unit.c), Pair(newR, newC))
-        if (path.size <= 1) { unit.hasMoved = true; showActionUI(); return }
-        clearHighlights(); reachableTiles.clear(); isInteractionLocked = true
-        animatePath(unit, path, 1) { unit.hasMoved = true; isInteractionLocked = false; showActionUI() }
+        if (path.size <= 1) {
+            unit.hasMoved = true
+            showActionUI()
+            return
+        }
+        clearHighlights()
+        reachableTiles.clear()
+        isInteractionLocked = true
+        animatePath(unit, path, 1) {
+            unit.hasMoved       = true
+            isInteractionLocked = false
+            showActionUI()
+        }
     }
 
-    private fun findPath(unit: GameUnit, start: Pair<Int,Int>, target: Pair<Int,Int>): List<Pair<Int,Int>> {
-        val queue: Queue<List<Pair<Int,Int>>> = LinkedList()
-        queue.add(listOf(start)); val visited = mutableSetOf(start)
+
+    private fun findPath(
+        unit: GameUnit,
+        start: Pair<Int, Int>,
+        target: Pair<Int, Int>
+    ): List<Pair<Int, Int>> {
+        val queue: Queue<List<Pair<Int, Int>>> = LinkedList()
+        val visited = mutableSetOf(start)
+        queue.add(listOf(start))
+
         while (queue.isNotEmpty()) {
-            val path = queue.poll()!!; val current = path.last()
+            val path    = queue.poll()!!
+            val current = path.last()
             if (current == target) return path
-            for (n in listOf(Pair(current.first-1,current.second),Pair(current.first+1,current.second),Pair(current.first,current.second-1),Pair(current.first,current.second+1))) {
-                if (n.first in 0 until rows && n.second in 0 until cols && n !in visited) {
-                    val tt = getTileTypeAt(n.first, n.second)
-                    val ok = when(tt) { 3->false; 4->unit.type==UnitType.PLANE; else->true }
-                    if (ok && units.none { it.r==n.first && it.c==n.second && it!=unit }) {
-                        visited.add(n); queue.add(path + n)
-                    }
+
+            for ((nr, nc) in neighbors(current.first, current.second)) {
+                val next = Pair(nr, nc)
+                if (next !in visited &&
+                    canTraverse(nr, nc, unit.type) &&
+                    units.none { it.r == nr && it.c == nc && it != unit }) {
+                    visited.add(next)
+                    queue.add(path + next)
                 }
             }
         }
         return listOf(start)
     }
 
-    private fun animatePath(unit: GameUnit, path: List<Pair<Int,Int>>, index: Int, onComplete: () -> Unit) {
-        if (index >= path.size) { unit.state = UnitState.STILL; updateUnitsAnimations(); onComplete(); return }
-        val prev = path[index - 1]; val curr = path[index]
+    private fun animatePath(
+        unit: GameUnit,
+        path: List<Pair<Int, Int>>,
+        index: Int,
+        onComplete: () -> Unit
+    ) {
+        if (index >= path.size) {
+            unit.state = UnitState.STILL
+            updateUnitsAnimations()
+            onComplete()
+            return
+        }
+        val prev = path[index - 1]
+        val curr = path[index]
         unit.state = when {
             curr.first  < prev.first  -> UnitState.UP
             curr.first  > prev.first  -> UnitState.DOWN
             curr.second < prev.second -> UnitState.LEFT
-            curr.second > prev.second -> UnitState.RIGHT
-            else -> UnitState.STILL
+            else                      -> UnitState.RIGHT
         }
         updateUnitsAnimations()
         moveUnitDirectly(unit, curr.first, curr.second)
+
+
+        if (isMultiplayer) syncGameStateToFirestore()
+
         handler.postDelayed({ animatePath(unit, path, index + 1, onComplete) }, 500)
     }
 
-    private fun showActionUI() {
-        llActions.visibility = View.VISIBLE
-        isWaitingForAction = false; isWaitingForSecondary = false
+    private fun moveUnitDirectly(unit: GameUnit, newR: Int, newC: Int) {
+        val oldFrame = boardCells[unit.r][unit.c]
+        val newFrame = boardCells[newR][newC]
+        val view     = unit.view ?: return
+        val cellSize = oldFrame?.width?.toFloat() ?: 0f
+
+        oldFrame?.removeView(view)
+        newFrame?.addView(view)
+        newFrame?.elevation = 100f
+
+        view.translationX = (unit.c - newC) * cellSize
+        view.translationY = (unit.r - newR) * cellSize
+        view.animate()
+            .translationX(0f)
+            .translationY(0f)
+            .setDuration(400)
+            .withEndAction { newFrame?.elevation = 0f }
+            .start()
+
+        unit.r = newR
+        unit.c = newC
     }
+
+    private fun updateUnitsAnimations() {
+        for (unit in units) {
+            val teamStr     = if (unit.team == 0) "red" else "blue"
+            val statePrefix = when {
+                unit.hasActed                                                        -> "unavailable"
+                unit.state == UnitState.UP                                           -> "up"
+                unit.state == UnitState.DOWN                                         -> "down"
+                unit.state == UnitState.LEFT || unit.state == UnitState.RIGHT        -> "move"
+                else                                                                 -> "still"
+            }
+            val resId = resources.getIdentifier(
+                "${unit.type.prefix}$statePrefix$teamStr$currentFrame",
+                "drawable",
+                requireContext().packageName
+            )
+            if (resId != 0) unit.view?.setImageResource(resId)
+
+            val scale = if (statePrefix in listOf("up", "down", "move")) 1.4f else 1.0f
+            unit.view?.scaleY = scale
+            unit.view?.scaleX = when (unit.state) {
+                UnitState.RIGHT -> -scale
+                UnitState.LEFT  ->  scale
+                else            -> if ((unit.view?.scaleX ?: 1f) < 0) -scale else scale
+            }
+        }
+    }
+
+
 
     private fun finishUnitTurn() {
         clearSelection()
         checkTurnEnd()
         updateTurnUI()
-        syncGameStateToFirestore()          // ← persist after every turn
+        syncGameStateToFirestore()
     }
 
     private fun checkTurnEnd() {
         if (isBattleInProgress) return
-        val currentTeamUnits = units.filter { it.team == currentTeam }
-        if (currentTeamUnits.isNotEmpty() && currentTeamUnits.all { it.hasActed }) {
-            currentTeam = 1 - currentTeam
-            units.filter { it.team == currentTeam }.forEach {
-                it.hasActed = false; it.hasMoved = false; resetUnitAppearance(it)
-            }
-            syncGameStateToFirestore()
+        val teamUnits = units.filter { it.team == currentTeam }
+        if (teamUnits.isEmpty() || !teamUnits.all { it.hasActed }) return
+
+
+        currentTeam = 1 - currentTeam
+        units.filter { it.team == currentTeam }.forEach {
+            it.hasActed = false
+            it.hasMoved = false
+            resetUnitAppearance(it)
+        }
+
+
+        syncGameStateToFirestore()
+
+        if (!isMultiplayer) {
+            updateTurnUI()
             if (isAiMode && currentTeam == 0) {
                 handler.postDelayed({ executeAiTurn() }, 1000)
             }
         }
+
     }
 
+    private fun updateTurnUI() {
+        val teamName = when {
+            isMultiplayer && currentTeam == localTeam      -> "TU TURNO"
+            isMultiplayer && currentTeam != localTeam      -> "TURNO RIVAL"
+            currentTeam == 0 && isAiMode                   -> "ROJO (IA)"
+            currentTeam == 0                               -> "ROJO"
+            else                                           -> "AZUL"
+        }
+        tvTurnTitle.text = "TURNO JUGADOR $teamName"
+        tvTurnTitle.setTextColor(if (currentTeam == 0) Color.RED else Color.CYAN)
+        tvHealthInfo.text = units
+            .filter { it.team == currentTeam }
+            .joinToString(" | ") { "${it.type.displayName}: ${it.health}" }
+    }
+
+
+
     private fun checkVictory() {
-        val redUnits  = units.filter { it.team == 0 }
-        val blueUnits = units.filter { it.team == 1 }
-        if (redUnits.isEmpty())  navigateToVictory(1)
-        else if (blueUnits.isEmpty()) navigateToVictory(0)
+        when {
+            units.none { it.team == 0 } -> navigateToVictory(winnerTeam = 1)
+            units.none { it.team == 1 } -> navigateToVictory(winnerTeam = 0)
+        }
     }
 
     private fun navigateToVictory(winnerTeam: Int) {
         handler.removeCallbacks(animationRunnable)
         firestoreListener?.remove()
-
         if (gameId.isNotBlank()) {
             db.collection("games").document(gameId)
                 .update("winner", winnerTeam, "finished", true)
@@ -815,6 +1155,33 @@ class GameFragment : Fragment() {
             .commit()
     }
 
-    private fun grayOutUnit(unit: GameUnit) { unit.hasActed = true; unit.view?.colorFilter = null }
-    private fun resetUnitAppearance(unit: GameUnit) { unit.view?.colorFilter = null }
+    private fun getTileTypeAt(r: Int, c: Int) = getTileNum(selectedMapId, r * cols + c)
+
+    private fun canTraverse(r: Int, c: Int, type: UnitType): Boolean =
+        when (getTileTypeAt(r, c)) {
+            3    -> false
+            4    -> type == UnitType.PLANE
+            else -> true
+        }
+
+
+    private fun neighbors(r: Int, c: Int): List<Pair<Int, Int>> =
+        listOf(r - 1 to c, r + 1 to c, r to c - 1, r to c + 1)
+            .filter { (nr, nc) -> nr in 0 until rows && nc in 0 until cols }
+            .map { (nr, nc) -> Pair(nr, nc) }
+
+    private fun manhattan(r1: Int, c1: Int, r2: Int, c2: Int) =
+        Math.abs(r1 - r2) + Math.abs(c1 - c2)
+
+    private fun grayOutUnit(unit: GameUnit) {
+        unit.hasActed    = true
+        unit.view?.colorFilter = null
+    }
+
+    private fun resetUnitAppearance(unit: GameUnit) {
+        unit.view?.colorFilter = null
+    }
+
+    private fun showToast(message: String) =
+        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
 }

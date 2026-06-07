@@ -1,5 +1,8 @@
 package com.example.tacticalwars
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ObjectAnimator
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.os.Bundle
@@ -9,7 +12,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.fragment.app.Fragment
 
 class BattleFragment : Fragment() {
@@ -26,14 +29,18 @@ class BattleFragment : Fragment() {
 
     private var damage: Int = 0
 
-
     private var isRemote: Boolean = false
 
     private lateinit var ivUnitBlue: ImageView
     private lateinit var ivUnitRed: ImageView
-    private lateinit var pbHealthBlue: ProgressBar
-    private lateinit var pbHealthRed: ProgressBar
     private lateinit var ivFireEffect: ImageView
+    private lateinit var ivMissile: ImageView
+
+    // Top Bar UI
+    private lateinit var ivTopUnitLeft: ImageView
+    private lateinit var ivTopUnitRight: ImageView
+    private lateinit var tvTopHealthLeft: TextView
+    private lateinit var tvTopHealthRight: TextView
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -103,16 +110,20 @@ class BattleFragment : Fragment() {
 
         ivUnitBlue   = view.findViewById(R.id.ivUnitBlue)
         ivUnitRed    = view.findViewById(R.id.ivUnitRed)
-        pbHealthBlue = view.findViewById(R.id.pbHealthBlue)
-        pbHealthRed  = view.findViewById(R.id.pbHealthRed)
         ivFireEffect = view.findViewById(R.id.ivFireEffect)
+        ivMissile    = view.findViewById(R.id.ivMissile)
 
-        ivUnitBlue.scaleX = -1f
+        ivTopUnitLeft    = view.findViewById(R.id.ivTopUnitLeft)
+        ivTopUnitRight   = view.findViewById(R.id.ivTopUnitRight)
+        tvTopHealthLeft  = view.findViewById(R.id.tvTopHealthLeft)
+        tvTopHealthRight = view.findViewById(R.id.tvTopHealthRight)
 
         setupInitialState()
-        startBattleSequence()
-    }
 
+        view.post {
+            startBattleSequence()
+        }
+    }
 
     private fun setupInitialState() {
         val (blueType, redType) = if (attackerTeam == 1)
@@ -120,128 +131,212 @@ class BattleFragment : Fragment() {
         else
             Pair(targetType, attackerType)
 
-        ivUnitBlue.setImageResource(getIdleRes(blueType, 1))
-        ivUnitRed.setImageResource(getIdleRes(redType, 0))
+        updateUnitSprite(ivUnitBlue, blueType, 1, "idle")
+        updateUnitSprite(ivUnitRed, redType, 0, "idle")
+
+
+        setTopBarSprite(ivTopUnitLeft, blueType, 1)
+        setTopBarSprite(ivTopUnitRight, redType, 0)
 
         if (attackerTeam == 1) {
-            pbHealthBlue.max      = attackerMaxHP * 10
-            pbHealthBlue.progress = attackerCurrentHP * 10
-            pbHealthRed.max       = targetMaxHP * 10
-            pbHealthRed.progress  = targetCurrentHP * 10
+            tvTopHealthLeft.text  = attackerCurrentHP.toString()
+            tvTopHealthRight.text = targetCurrentHP.toString()
         } else {
-            pbHealthBlue.max      = targetMaxHP * 10
-            pbHealthBlue.progress = targetCurrentHP * 10
-            pbHealthRed.max       = attackerMaxHP * 10
-            pbHealthRed.progress  = attackerCurrentHP * 10
+            tvTopHealthLeft.text  = targetCurrentHP.toString()
+            tvTopHealthRight.text = attackerCurrentHP.toString()
         }
     }
 
-    private fun getIdleRes(type: String, team: Int): Int {
+    private fun setTopBarSprite(imageView: ImageView, type: String, team: Int) {
         val teamStr = if (team == 0) "red" else "blue"
-        var resId = resources.getIdentifier(
-            "${type}idle${teamStr}", "drawable", requireContext().packageName
-        )
-        if (resId == 0) {
-            resId = resources.getIdentifier(
-                "$type$teamStr", "drawable", requireContext().packageName
-            )
+        val resName = "${type}still${teamStr}1"
+        val resId = resources.getIdentifier(resName, "drawable", requireContext().packageName)
+        if (resId != 0) {
+            imageView.setImageResource(resId)
+            imageView.scaleX = if (team == 1) -1f else 1f
         }
-        return resId
     }
 
+    private fun updateUnitSprite(imageView: ImageView, type: String, team: Int, state: String, frame: Int = -1) {
+        val teamStr = if (team == 0) "red" else "blue"
+
+        var names = if (state == "idle") {
+            listOf("${type}${teamStr}idle", "${type}${teamStr}", "${type}idle${teamStr}")
+        } else {
+            listOf("${type}${teamStr}fire$frame", "${type}fire${teamStr}$frame", "assembly${type}${teamStr}$frame")
+        }
+
+        if (type == "tank") {
+            if (state == "idle") {
+                names = listOf("${type}fire${teamStr}1") + names.filter { it != "${type}${teamStr}" }
+            } else {
+                names = names.filter { it != "${type}${teamStr}" }
+            }
+        }
+
+        var resId = 0
+        for (name in names) {
+            resId = resources.getIdentifier(name, "drawable", requireContext().packageName)
+            if (resId != 0) break
+        }
+
+        if (resId != 0) {
+            imageView.setImageResource(resId)
+
+            val baseScale = when (type) {
+                "infantry" -> 2.0f
+                "bazooka"  -> 2.5f
+                "tank"     -> 2.0f
+                else       -> 1.0f
+            }
+
+            imageView.scaleX = baseScale
+            imageView.scaleY = baseScale
+        }
+    }
 
     private fun startBattleSequence() {
-        if (attackerType == "tank" || attackerType == "jet") {
-            animateTankJetBattle()
+        if (attackerType == "jet") {
+            animateJetBattle()
         } else {
-            animateInfantryBattle()
+            animateUnitFiringSequence()
         }
     }
 
-    private fun animateTankJetBattle() {
-        val targetImg = if (attackerTeam == 1) ivUnitRed else ivUnitBlue
-        val targetPb  = if (attackerTeam == 1) pbHealthRed else pbHealthBlue
+    private fun animateJetBattle() {
+        val attackerImg = if (attackerTeam == 1) ivUnitBlue else ivUnitRed
+        val targetImg   = if (attackerTeam == 1) ivUnitRed else ivUnitBlue
+        val targetTv    = if (attackerTeam == 1) tvTopHealthRight else tvTopHealthLeft
 
+        val density = resources.displayMetrics.density
+        val missileW = if (ivMissile.width > 0) ivMissile.width.toFloat() else 40f * density
+        val missileH = if (ivMissile.height > 0) ivMissile.height.toFloat() else 40f * density
+
+        val attackerCenterX = attackerImg.x + (attackerImg.width / 2f)
+        val attackerCenterY = attackerImg.y + (attackerImg.height / 2f)
+
+        val attackerVisualWidth = attackerImg.width.toFloat()
+
+        val targetCenterX = targetImg.x + (targetImg.width / 2f)
+        val targetVisualWidth = targetImg.width.toFloat()
+
+        val startX: Float
+        val targetX: Float
+
+        if (attackerTeam == 1) {
+            startX = attackerCenterX + (attackerVisualWidth / 2f)
+            targetX = targetCenterX - (targetVisualWidth / 2f) - missileW
+            ivMissile.scaleX = 1f
+        } else {
+            startX = attackerCenterX - (attackerVisualWidth / 2f) - missileW
+            targetX = targetCenterX + (targetVisualWidth / 2f)
+            ivMissile.scaleX = -1f
+        }
+
+        val finalTargetX = if (attackerTeam == 1) {
+            maxOf(startX + 10f, targetX)
+        } else {
+            minOf(startX - 10f, targetX)
+        }
+
+        ivMissile.visibility = View.VISIBLE
+        ivMissile.y = attackerCenterY - (missileH / 2f)
+
+        val missileAnimation = ObjectAnimator.ofFloat(ivMissile, "x", startX, finalTargetX)
+        missileAnimation.duration = 800
+
+        missileAnimation.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                ivMissile.visibility = View.GONE
+                showExplosionEffect(targetImg, targetTv)
+            }
+        })
+
+        missileAnimation.start()
+        playGunshotSound()
+    }
+
+    private fun showExplosionEffect(targetImg: ImageView, targetTv: TextView) {
         var frame = 1
         val fireRunnable = object : Runnable {
             override fun run() {
                 val resId = resources.getIdentifier(
                     "fire$frame", "drawable", requireContext().packageName
                 )
-                if (frame == 1) playGunshotSound()
 
                 if (resId != 0) {
                     ivFireEffect.setImageResource(resId)
                     ivFireEffect.visibility = View.VISIBLE
-                    ivFireEffect.x = targetImg.x + (targetImg.width / 4)
-                    ivFireEffect.y = targetImg.y + (targetImg.height / 4)
+
+                    val density = resources.displayMetrics.density
+                    val targetCenterX = targetImg.x + (targetImg.width / 2f)
+                    val targetCenterY = targetImg.y + (targetImg.height / 2f)
+                    val effectW = if (ivFireEffect.width > 0) ivFireEffect.width.toFloat() else 80f * density
+                    val effectH = if (ivFireEffect.height > 0) ivFireEffect.height.toFloat() else 80f * density
+
+                    ivFireEffect.x = targetCenterX - (effectW / 2f)
+                    ivFireEffect.y = targetCenterY - (effectH / 2f)
                 }
 
                 if (frame == 1) {
                     frame = 2
-                    handler.postDelayed(this, 500)
+                    handler.postDelayed(this, 300)
                 } else {
                     handler.postDelayed({
                         ivFireEffect.visibility = View.GONE
-                        applyDamageAnimation(targetImg, targetPb)
-                    }, 500)
+                        applyDamageAnimation(targetImg, targetTv)
+                    }, 300)
                 }
             }
         }
         handler.post(fireRunnable)
     }
 
-    private fun animateInfantryBattle() {
+    private fun animateUnitFiringSequence() {
         val attackerImg = if (attackerTeam == 1) ivUnitBlue else ivUnitRed
-        val teamStr     = if (attackerTeam == 0) "red" else "blue"
         val targetImg   = if (attackerTeam == 1) ivUnitRed else ivUnitBlue
-        val targetPb    = if (attackerTeam == 1) pbHealthRed else pbHealthBlue
-        startAssemblyAnimation(attackerImg, teamStr, targetImg, targetPb)
+        val targetTv    = if (attackerTeam == 1) tvTopHealthRight else tvTopHealthLeft
+        startFiringAnimation(attackerImg, targetImg, targetTv)
     }
 
-    private fun startAssemblyAnimation(
+    private fun startFiringAnimation(
         attackerImg: ImageView,
-        teamStr: String,
         targetImg: ImageView,
-        targetPb: ProgressBar
+        targetTv: TextView
     ) {
-        val originalScaleX = attackerImg.scaleX
-        val originalScaleY = attackerImg.scaleY
-        attackerImg.scaleX = originalScaleX * 1.5f
-        attackerImg.scaleY = originalScaleY * 1.5f
-
-        var assemblyFrame = 1
-        val assemblyRunnable = object : Runnable {
+        var fireFrame = 1
+        val firingRunnable = object : Runnable {
             override fun run() {
-                var resId = resources.getIdentifier(
-                    "assembly${attackerType}$teamStr$assemblyFrame",
-                    "drawable", requireContext().packageName
+                val teamStr = if (attackerTeam == 0) "red" else "blue"
+                val possibleNames = listOf(
+                    "${attackerType}${teamStr}fire$fireFrame",
+                    "${attackerType}fire${teamStr}$fireFrame",
+                    "assembly${attackerType}${teamStr}$fireFrame"
                 )
-                if (resId == 0) {
-                    resId = resources.getIdentifier(
-                        "assembly${attackerType}aim$teamStr$assemblyFrame",
-                        "drawable", requireContext().packageName
-                    )
+
+                var resId = 0
+                for (name in possibleNames) {
+                    if (resources.getIdentifier(name, "drawable", requireContext().packageName) != 0) {
+                        resId = 1
+                        break
+                    }
                 }
 
-                if (assemblyFrame == 1) playGunshotSound()
-
                 if (resId != 0) {
-                    attackerImg.setImageResource(resId)
-                    assemblyFrame++
+                    if (fireFrame == 1) playGunshotSound()
+                    updateUnitSprite(attackerImg, attackerType, attackerTeam, "fire", fireFrame)
+                    fireFrame++
                     handler.postDelayed(this, 500)
                 } else {
-                    attackerImg.scaleX = originalScaleX
-                    attackerImg.scaleY = originalScaleY
-                    attackerImg.setImageResource(getIdleRes(attackerType, attackerTeam))
-                    applyDamageAnimation(targetImg, targetPb)
+                    updateUnitSprite(attackerImg, attackerType, attackerTeam, "idle")
+                    applyDamageAnimation(targetImg, targetTv)
                 }
             }
         }
-        handler.post(assemblyRunnable)
+        handler.post(firingRunnable)
     }
 
-    private fun applyDamageAnimation(targetImg: ImageView, targetPb: ProgressBar) {
+    private fun applyDamageAnimation(targetImg: ImageView, targetTv: TextView) {
         val flashRunnable = object : Runnable {
             var count = 0
             override fun run() {
@@ -253,8 +348,11 @@ class BattleFragment : Fragment() {
                     handler.postDelayed(this, 100)
                 } else {
                     targetImg.visibility = View.VISIBLE
-                    val newProgress = maxOf(0, targetPb.progress - (damage * 10))
-                    targetPb.progress = newProgress
+
+                    // Solo actualizamos la salud en el Top Bar
+                    val currentHP = if (targetTeam == attackerTeam) attackerCurrentHP else targetCurrentHP
+                    val newHP = maxOf(0, currentHP - damage)
+                    targetTv.text = newHP.toString()
 
                     handler.postDelayed({
                         finishBattle()
@@ -265,14 +363,12 @@ class BattleFragment : Fragment() {
         handler.post(flashRunnable)
     }
 
-
     private fun finishBattle() {
         if (!isRemote) {
             parentFragmentManager.setFragmentResult("battle_done", Bundle())
         }
         parentFragmentManager.popBackStack()
     }
-
 
     private fun playGunshotSound() {
         context?.let { ctx ->

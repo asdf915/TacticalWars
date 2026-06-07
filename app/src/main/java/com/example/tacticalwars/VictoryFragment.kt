@@ -59,6 +59,9 @@ class VictoryFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+
+        (requireActivity() as MainActivity).changeMusic(R.raw.musicavictoryfragment, false)
+
         val tvVictoryMessage = view.findViewById<TextView>(R.id.tvVictoryMessage)
         val llWinnerUnitsRow1 = view.findViewById<LinearLayout>(R.id.llWinnerUnitsRow1)
         val llWinnerUnitsRow2 = view.findViewById<LinearLayout>(R.id.llWinnerUnitsRow2)
@@ -72,7 +75,7 @@ class VictoryFragment : Fragment() {
 
         for (i in 0 until 4) {
             val unitView = ImageView(requireContext())
-            // Increased size in Victory Screen to 120dp
+
             val size = (resources.displayMetrics.density * 120).toInt()
             val params = LinearLayout.LayoutParams(size, size)
             params.setMargins(8, 0, 8, 0)
@@ -80,12 +83,12 @@ class VictoryFragment : Fragment() {
             unitView.setPadding(8, 8, 8, 8)
             unitView.tag = unitPrefixes[i]
             
-            // Mirror blue units so they face right
+
             if (winnerTeam == 1) {
                 unitView.scaleX = -1f
             }
             
-            // Infantry and Bazooka in Row 1 (top), Tank and Jet in Row 2 (bottom)
+
             if (i < 2) {
                 llWinnerUnitsRow1.addView(unitView)
             } else {
@@ -118,20 +121,20 @@ class VictoryFragment : Fragment() {
         for (view in winnerUnitViews) {
             val prefix = view.tag as String
             
-            // Priority: "still" with frame (the standard idle animation in this project)
+
             var resId = resources.getIdentifier("${prefix}still$teamStr$currentFrame", "drawable", requireContext().packageName)
             
-            // Fallback: "still" without frame
+
             if (resId == 0) {
                 resId = resources.getIdentifier("${prefix}still$teamStr", "drawable", requireContext().packageName)
             }
 
-            // Fallback: "idle"
+
             if (resId == 0) {
                 resId = resources.getIdentifier("${prefix}idle$teamStr$currentFrame", "drawable", requireContext().packageName)
             }
 
-            // Final fallback
+
             if (resId == 0) {
                 resId = resources.getIdentifier("$prefix$teamStr", "drawable", requireContext().packageName)
             }

@@ -40,7 +40,7 @@ class MultiplayerLobbyFragment : Fragment() {
     private lateinit var progressWaiting: ProgressBar
     private lateinit var tvWaitingStatus: TextView
 
-    // Pantalla unirse
+
     private lateinit var etGameCode: EditText
     private lateinit var btnJoinConfirm: Button
     private lateinit var btnCancelJoin: Button

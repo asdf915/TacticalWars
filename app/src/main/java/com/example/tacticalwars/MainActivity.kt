@@ -10,6 +10,8 @@ import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : AppCompatActivity() {
     private var musicPlayer: MediaPlayer? = null
+    private var currentMusicResId: Int = -1
+
     var musicVolume: Float = 0.5f
         set(value) {
             field = value
@@ -27,20 +29,23 @@ class MainActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
-        startMusic()
     }
 
-    fun startMusic() {
-        if (musicPlayer == null) {
-            try {
-                musicPlayer = MediaPlayer.create(this, R.raw.musica_guerra)
-                musicPlayer?.isLooping = true
-                musicPlayer?.setVolume(musicVolume, musicVolume)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+    fun changeMusic(resId: Int, loop: Boolean = true) {
+        if (currentMusicResId == resId && musicPlayer?.isPlaying == true) return
+
+        musicPlayer?.stop()
+        musicPlayer?.release()
+        
+        try {
+            musicPlayer = MediaPlayer.create(this, resId)
+            musicPlayer?.isLooping = loop
+            musicPlayer?.setVolume(musicVolume, musicVolume)
+            musicPlayer?.start()
+            currentMusicResId = resId
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        musicPlayer?.start()
     }
 
     fun playSfx(resId: Int) {

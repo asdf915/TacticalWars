@@ -4,7 +4,6 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
-import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -24,7 +23,6 @@ import com.google.android.material.slider.Slider
 class HomeFragment : Fragment() {
 
     private var animatorSets: MutableList<AnimatorSet> = mutableListOf()
-    private var mediaPlayer: MediaPlayer? = null
     private var musicVolume: Float = 0.5f
     private var sfxVolume: Float = 0.5f
     private var difficulty: String = "Normal"
@@ -52,6 +50,11 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        val mainActivity = requireActivity() as MainActivity
+        musicVolume = mainActivity.musicVolume
+        sfxVolume = mainActivity.sfxVolume
+        difficulty = mainActivity.gameDifficulty
+
         setupMusic()
 
         redUnits = listOf(R.id.redUnit1, R.id.redUnit2, R.id.redUnit3, R.id.redUnit4).map { view.findViewById<ImageView>(it) }
@@ -63,7 +66,6 @@ class HomeFragment : Fragment() {
         view.post {
             if (isAdded) {
                 val screenWidth = view.width.toFloat()
-                // Blue starts immediately, Red starts with a delay of 3 seconds
                 startParade(blueUnits, R.id.llBlueLane, screenWidth, 0L)
                 startParade(redUnits, R.id.llRedLane, screenWidth, 3000L)
             }
@@ -106,10 +108,7 @@ class HomeFragment : Fragment() {
     }
 
     private fun setupMusic() {
-        mediaPlayer = MediaPlayer.create(context, R.raw.musica_guerra)
-        mediaPlayer?.isLooping = true
-        mediaPlayer?.setVolume(musicVolume, musicVolume)
-        mediaPlayer?.start()
+        (requireActivity() as MainActivity).changeMusic(R.raw.musica_guerra)
     }
 
     private fun showSettingsDialog() {
@@ -134,11 +133,15 @@ class HomeFragment : Fragment() {
         spinnerDifficulty.setSelection(difficulties.indexOf(difficulty))
 
         btnApply.setOnClickListener {
+            val mainActivity = requireActivity() as MainActivity
+            
             musicVolume = sliderMusic.value
             sfxVolume = sliderSFX.value
             difficulty = spinnerDifficulty.selectedItem.toString()
 
-            mediaPlayer?.setVolume(musicVolume, musicVolume)
+            mainActivity.musicVolume = musicVolume
+            mainActivity.sfxVolume = sfxVolume
+            mainActivity.gameDifficulty = difficulty
 
             dialog.dismiss()
         }
@@ -185,25 +188,10 @@ class HomeFragment : Fragment() {
         animatorSets.add(animatorSet)
     }
 
-    override fun onResume() {
-        super.onResume()
-        mediaPlayer?.start()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        mediaPlayer?.pause()
-    }
-
     override fun onDestroyView() {
-
         animatorSets.forEach { it.cancel() }
         animatorSets.clear()
         handler.removeCallbacks(animationRunnable)
-
-        mediaPlayer?.release()
-        mediaPlayer = null
-
         super.onDestroyView()
     }
 }

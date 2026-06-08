@@ -94,6 +94,7 @@ class GameFragment : Fragment() {
         var hasActed: Boolean = false,
         var hasMoved: Boolean = false,
         var attackPower: Int = type.baseAttack,
+        var attackBonus: Int = 0,
         var view: ImageView? = null,
         var state: UnitState = UnitState.STILL
     )
@@ -128,7 +129,7 @@ class GameFragment : Fragment() {
                 2, 1, 2, 1, 4, 1
             ),
             3 to listOf(
-                1, 3, 1, 1, 1, 2,
+                3, 1, 1, 1, 1, 2,
                 1, 1, 1, 1, 1, 3,
                 4, 4, 1, 1, 1, 1,
                 1, 4, 4, 5, 4, 4,
@@ -149,7 +150,7 @@ class GameFragment : Fragment() {
             ),
             5 to listOf(
                 3, 1, 1, 1, 2, 2,
-                3, 3, 4, 1, 4, 1,
+                3, 1, 4, 1, 4, 1,
                 1, 1, 1, 1, 1, 1,
                 5, 4, 4, 5, 5, 4,
                 1, 2, 6, 1, 1, 2,
@@ -254,11 +255,16 @@ class GameFragment : Fragment() {
     }
 
     private fun setupBattleResultListener() {
-        parentFragmentManager.setFragmentResultListener("battle_done", viewLifecycleOwner) { _, _ ->
+        parentFragmentManager.setFragmentResultListener("battle_done", viewLifecycleOwner) { _, bundle ->
             isBattleInProgress    = false
             isInteractionLocked   = false
             isWaitingForAction    = false
             isWaitingForSecondary = false
+            val targetIdx  = bundle.getInt("targetIdx", -1)
+            val damage     = bundle.getInt("damage", 0)
+            if (targetIdx >= 0 && damage > 0) {
+                units.getOrNull(targetIdx)?.let { it.health -= damage }
+            }
             checkUnitDeaths()
             val pendingUnits = units.filter { it.team == currentTeam && !it.hasActed }
             if (pendingUnits.isNotEmpty()) {
@@ -321,7 +327,11 @@ class GameFragment : Fragment() {
                 if (remoteTeam != currentTeam && !isBattleInProgress) {
                     currentTeam = remoteTeam
                     units.filter { it.team == currentTeam }.forEach {
-                        it.hasActed = false; it.hasMoved = false; resetUnitAppearance(it)
+                        it.hasActed    = false
+                        it.hasMoved    = false
+                        it.attackBonus = 0
+                        it.attackPower = it.type.baseAttack
+                        resetUnitAppearance(it)
                     }
                     clearSelection()
                     updateTurnUI()
@@ -334,13 +344,12 @@ class GameFragment : Fragment() {
     }
 
     private fun buildGameState() = mapOf(
-        "currentTeam"        to currentTeam,
-        "difficulty"         to difficulty,
-        "isAiMode"           to isAiMode,
-        "isMultiplayer"      to isMultiplayer,
-        "selectedMapId"      to selectedMapId,
-        "isBattleInProgress" to isBattleInProgress,
-        "units"              to serializeUnits()
+        "currentTeam"    to currentTeam,
+        "difficulty"     to difficulty,
+        "isAiMode"       to isAiMode,
+        "isMultiplayer"  to isMultiplayer,
+        "selectedMapId"  to selectedMapId,
+        "units"          to serializeUnits()
     )
 
     private fun serializeUnits(): List<Map<String, Any>> = units.map { u ->
@@ -629,20 +638,32 @@ class GameFragment : Fragment() {
                 r == sel.r && c == sel.c && !sel.hasActed               -> showActionUI()
                 else -> {
                     clearSelection()
-                    unitAtCell?.takeIf { it.team == currentTeam && !it.hasActed }?.let { selectUnit(it) }
+                    if (unitAtCell != null) {
+                        if (unitAtCell.team == currentTeam && !unitAtCell.hasActed) {
+                            selectUnit(unitAtCell)
+                        } else {
+                            showUnitStats(unitAtCell)
+                        }
+                    }
                 }
             }
         } else {
-            unitAtCell?.takeIf { it.team == currentTeam && !it.hasActed }?.let { selectUnit(it) }
+            if (unitAtCell != null) {
+                if (unitAtCell.team == currentTeam && !unitAtCell.hasActed) {
+                    selectUnit(unitAtCell)
+                } else {
+                    showUnitStats(unitAtCell)
+                }
+            }
         }
     }
 
     private fun startBattle(attacker: GameUnit, target: GameUnit, damage: Int) {
-        target.health     -= damage
-        attacker.hasActed  = true
+        attacker.hasActed = true
         grayOutUnit(attacker)
 
         if (isMultiplayer) {
+            target.health -= damage
             checkUnitDeaths()
             val pendingUnits = units.filter { it.team == currentTeam && !it.hasActed }
             if (pendingUnits.isNotEmpty()) {
@@ -666,7 +687,8 @@ class GameFragment : Fragment() {
                 BattleFragment.newInstance(
                     attacker.type.prefix, attacker.team, attacker.type.maxHP, attacker.health,
                     target.type.prefix,   target.team,   target.type.maxHP,   target.health,
-                    damage
+                    damage,
+                    targetIdx = units.indexOf(target)
                 )
             )
             .addToBackStack(null)
@@ -687,7 +709,11 @@ class GameFragment : Fragment() {
 
     private fun executeSecondaryAbility(user: GameUnit, target: GameUnit) {
         when (user.type) {
-            UnitType.INFANTRY -> { target.attackPower += 2; showToast("${target.type.displayName} potenciado!") }
+            UnitType.INFANTRY -> {
+                target.attackBonus  = 2
+                target.attackPower  = target.type.baseAttack + target.attackBonus
+                showToast("${target.type.displayName} potenciado!")
+            }
             UnitType.BAZOOKA  -> {
                 target.hasActed = false; target.hasMoved = false; resetUnitAppearance(target)
                 showToast("${target.type.displayName} reactivado!")
@@ -707,11 +733,24 @@ class GameFragment : Fragment() {
     }
 
     private fun selectUnit(unit: GameUnit) {
-        if (unit.hasActed) return
+        if (unit.hasActed) {
+            showUnitStats(unit)
+            return
+        }
         selectedUnit      = unit
-        tvUnitDetail.text = "UNIDAD: ${unit.type.displayName} | SALUD: ${unit.health}/${unit.maxHealth}"
+        showUnitStats(unit)
         btnSecondary.text = unit.type.abilityName
         if (unit.hasMoved) showActionUI() else showMovementRange(unit)
+    }
+
+    private fun showUnitStats(unit: GameUnit) {
+        tvUnitDetail.text = buildString {
+            append(unit.type.displayName)
+            append("  HP: ${unit.health}/${unit.maxHealth}")
+            append("  ATQ: ${unit.attackPower}")
+            append("  MOV: ${unit.type.moveRange}")
+            append("  RAN: ${unit.type.attackRange}")
+        }
     }
 
     private fun clearSelection() {
@@ -893,7 +932,11 @@ class GameFragment : Fragment() {
         if (teamUnits.isEmpty() || !teamUnits.all { it.hasActed }) return
         currentTeam = 1 - currentTeam
         units.filter { it.team == currentTeam }.forEach {
-            it.hasActed = false; it.hasMoved = false; resetUnitAppearance(it)
+            it.hasActed    = false
+            it.hasMoved    = false
+            it.attackBonus = 0
+            it.attackPower = it.type.baseAttack
+            resetUnitAppearance(it)
         }
         updateTurnUI()
         syncGameStateToFirestore()
@@ -904,17 +947,15 @@ class GameFragment : Fragment() {
 
     private fun updateTurnUI() {
         val teamName = when {
-            isMultiplayer && currentTeam == localTeam -> "TURNO DEL JUGADOR"
-            isMultiplayer                             -> "TURNO DEL RIVAL"
-            currentTeam == 0 && isAiMode             -> "TURNO ROJO"
-            currentTeam == 0                          -> "TURNO ROJO"
-            else                                      -> "TURNO AZUL"
+            isMultiplayer && currentTeam == localTeam -> "TU TURNO"
+            isMultiplayer                             -> "TURNO RIVAL"
+            currentTeam == 0 && isAiMode             -> "ROJO (IA)"
+            currentTeam == 0                          -> "ROJO"
+            else                                      -> "AZUL"
         }
-        tvTurnTitle.text = "$teamName"
+        tvTurnTitle.text = "TURNO JUGADOR $teamName"
         tvTurnTitle.setTextColor(if (currentTeam == 0) Color.RED else Color.CYAN)
-        tvHealthInfo.text = units
-            .filter { it.team == currentTeam }
-            .joinToString(" | ") { "${it.type.displayName}: ${it.health}" }
+        tvHealthInfo.visibility = View.GONE
     }
 
     private fun checkVictory() {
